@@ -1,3 +1,5 @@
+import sys
+
 def parse_excel():
     print("Parsing excel..")
     # parse excel
@@ -8,6 +10,7 @@ def create_vcard(contact: dict):
     """
     The mappings used below are from https://www.w3.org/TR/vcard-rdf/#Mapping
     """
+    vc_filename = f"{contact['last_name'].lower()}_{contact['first_name'].lower()}.vcf"
     vc_begin = "BEGIN:VCARD\n"
     vc_version = "VERSION:4.0\n"
     vc_name = f"N;charset=utf-8:{contact['last_name']};{contact['first_name']};;;\n"
@@ -19,11 +22,14 @@ def create_vcard(contact: dict):
     vc_address = f"ADR;type=work;charset=utf-8:{contact['address']['street']};{contact['address']['city']};{contact['address']['p_code']};{contact['address']['country']}\n"
     vc_end = "END:VCARD\n"
 
-    fo = open(f"{contact['last_name'].lower()}_{contact['first_name'].lower()}.vcf", "w")
-    fo.writelines([vc_begin, vc_version, vc_name, vc_title, vc_org, vc_phone, vc_email, vc_linkedin, vc_address, vc_end])
-    fo.close()
-
-    print(f"Created vCard for {contact['last_name']}")
+    try:
+        with open(vc_filename, "w") as f:
+            f.writelines([vc_begin, vc_version, vc_name, vc_title, vc_org, vc_phone, vc_email, vc_linkedin, vc_address, vc_end])
+            f.close()
+            print(f"Created vCard for {contact['last_name']}, {contact['first_name']}.")
+    except IOError:
+        print(f"I/O error for {vc_filename}")
+        sys.exit()
 
 
 def excel_to_vcard():
