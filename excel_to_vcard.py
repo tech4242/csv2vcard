@@ -28,18 +28,18 @@ def create_vcard(contact: dict):
     vc_org = f"ORG;charset=utf-8:{contact['org']}\n"
     vc_phone = f"TEL;type=work,voice:{contact['phone']}\n"
     vc_email = f"EMAIL;type=work:{contact['email']}\n"
-    vc_linkedin = f"URL;type=work:{contact['linkedin']}\n"
+    vc_website = f"URL;type=work:{contact['website']}\n"
     vc_address = f"ADR;type=work;charset=utf-8:{contact['street']};{contact['city']};{contact['p_code']};{contact['country']}\n"
     vc_end = "END:VCARD\n"
 
     # check if the export directory exists
     if not os.path.exists("export"):
         os.makedirs("export")
-        
+
     # save vCard to /export/
     try:
         with open(f"export/{vc_filename}", "w") as f:
-            f.writelines([vc_begin, vc_version, vc_name, vc_title, vc_org, vc_phone, vc_email, vc_linkedin, vc_address, vc_end])
+            f.writelines([vc_begin, vc_version, vc_name, vc_title, vc_org, vc_phone, vc_email, vc_website, vc_address, vc_end])
             f.close()
             print(f"Created vCard for {contact['last_name']}, {contact['first_name']}.")
     except IOError:
@@ -50,7 +50,7 @@ def excel_to_vcard(csv_filename: str):
     # mock with Forrest Gump
     mock_contacts = [{"last_name": "Gump", "first_name": "Forrest", "title": "Shrimp Man", "org": "Bubba Gump Shrimp Co.",
                  "phone": "+49 170 5 25 25 25", "email": "forrestgump@example.com",
-                 "linkedin": "https://www.linkedin.com/in/forrestgump",
+                 "website": "https://www.linkedin.com/in/forrestgump",
                  "street": "42 Plantation St.", "city": "Baytown", "p_code": "30314",
                  "country": "United States of America"}]
     for c in parse_csv(csv_filename):
