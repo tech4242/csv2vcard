@@ -10,7 +10,7 @@ def create_vcard(contact):
     vc_name = f"n;charset=utf-8:{contact['last_name']};{contact['first_name']};;;\n"
     vc_title = f"title;charset=utf-8:{contact['title']}\n"
     vc_org = f"org;charset=utf-8:{contact['org']}\n"
-    vc_phone = f"tel;type=work,voice:{contact'phone'}\n"
+    vc_phone = f"tel;type=work,voice:{contact['phone']}\n"
     vc_end = "end:vcard\n"
 
     fo = open(f"{contact['last_name'].lower()}.vcf", "w")
