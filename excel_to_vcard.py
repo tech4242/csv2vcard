@@ -1,8 +1,16 @@
-import sys
+import csv
+import codecs
 
-def parse_excel():
-    print("Parsing excel..")
-    # parse excel
+
+def parse_csv(csv_filename: str):
+    print("Parsing csv..")
+    try:
+        with codecs.open(f"{csv_filename}", "r", "utf-8-sig") as f:
+            contacts = csv.reader(f, delimiter=";")
+            for row in contacts:
+                print(row)
+    except IOError:
+        print(f"I/O error for {csv_filename}")
     return []
 
 
@@ -19,7 +27,7 @@ def create_vcard(contact: dict):
     vc_phone = f"TEL;type=work,voice:{contact['phone']}\n"
     vc_email = f"EMAIL;type=work:{contact['email']}\n"
     vc_linkedin = f"URL;type=work:{contact['linkedin']}\n"
-    vc_address = f"ADR;type=work;charset=utf-8:{contact['address']['street']};{contact['address']['city']};{contact['address']['p_code']};{contact['address']['country']}\n"
+    vc_address = f"ADR;type=work;charset=utf-8:{contact['street']};{contact['city']};{contact['p_code']};{contact['country']}\n"
     vc_end = "END:VCARD\n"
 
     try:
@@ -29,16 +37,15 @@ def create_vcard(contact: dict):
             print(f"Created vCard for {contact['last_name']}, {contact['first_name']}.")
     except IOError:
         print(f"I/O error for {vc_filename}")
-        sys.exit()
 
 
-def excel_to_vcard():
-    #contacts = parse_excel()
+def excel_to_vcard(csv_filename: str):
+    contacts = parse_csv(csv_filename)
     # mock with Forrest Gump
-    contacts = [{"last_name": "Gump", "first_name": "Forrest", "title": "Shrimp Man", "org": "Bubba Gump Shrimp Co.",
+    mock_contacts = [{"last_name": "Gump", "first_name": "Forrest", "title": "Shrimp Man", "org": "Bubba Gump Shrimp Co.",
                  "phone": "+49 170 5 25 25 25", "email": "forrestgump@example.com",
                  "linkedin": "https://www.linkedin.com/in/forrestgump",
-                 "address": {"street": "42 Plantation St.", "city": "Baytown", "p_code": "30314",
-                             "country": "United States of America"}}]
-    for c in contacts:
-        create_vcard(c)
+                 "street": "42 Plantation St.", "city": "Baytown", "p_code": "30314",
+                 "country": "United States of America"}]
+    #for c in contacts:
+    #    create_vcard(c)
