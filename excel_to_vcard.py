@@ -1,5 +1,6 @@
 import csv
 import codecs
+import os
 
 
 def parse_csv(csv_filename: str):
@@ -7,11 +8,12 @@ def parse_csv(csv_filename: str):
     try:
         with codecs.open(f"{csv_filename}", "r", "utf-8-sig") as f:
             contacts = csv.reader(f, delimiter=";")
-            for row in contacts:
-                print(row)
+            header = next(contacts)  # saves header
+            parsed_contacts = [dict(zip(header, row)) for row in contacts]
+            return parsed_contacts
     except IOError:
         print(f"I/O error for {csv_filename}")
-    return []
+        return []
 
 
 def create_vcard(contact: dict):
@@ -30,8 +32,13 @@ def create_vcard(contact: dict):
     vc_address = f"ADR;type=work;charset=utf-8:{contact['street']};{contact['city']};{contact['p_code']};{contact['country']}\n"
     vc_end = "END:VCARD\n"
 
+    # check if the export directory exists
+    if not os.path.exists("export"):
+        os.makedirs("export")
+        
+    # save vCard to /export/
     try:
-        with open(vc_filename, "w") as f:
+        with open(f"export/{vc_filename}", "w") as f:
             f.writelines([vc_begin, vc_version, vc_name, vc_title, vc_org, vc_phone, vc_email, vc_linkedin, vc_address, vc_end])
             f.close()
             print(f"Created vCard for {contact['last_name']}, {contact['first_name']}.")
@@ -40,12 +47,11 @@ def create_vcard(contact: dict):
 
 
 def excel_to_vcard(csv_filename: str):
-    contacts = parse_csv(csv_filename)
     # mock with Forrest Gump
     mock_contacts = [{"last_name": "Gump", "first_name": "Forrest", "title": "Shrimp Man", "org": "Bubba Gump Shrimp Co.",
                  "phone": "+49 170 5 25 25 25", "email": "forrestgump@example.com",
                  "linkedin": "https://www.linkedin.com/in/forrestgump",
                  "street": "42 Plantation St.", "city": "Baytown", "p_code": "30314",
                  "country": "United States of America"}]
-    #for c in contacts:
-    #    create_vcard(c)
+    for c in parse_csv(csv_filename):
+        create_vcard(c)
