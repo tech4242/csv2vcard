@@ -46,12 +46,14 @@ def create_vcard(contact: dict):
         print(f"I/O error for {vc_filename}")
 
 
-def excel_to_vcard(csv_filename: str):
-    # mock with Forrest Gump
+def csv_to_vcard(csv_filename: str):
+    """
+    Try it out with this mock Forrest Gump contact: create_vcard(mock_contacts[0])
     mock_contacts = [{"last_name": "Gump", "first_name": "Forrest", "title": "Shrimp Man", "org": "Bubba Gump Shrimp Co.",
                  "phone": "+49 170 5 25 25 25", "email": "forrestgump@example.com",
                  "website": "https://www.linkedin.com/in/forrestgump",
                  "street": "42 Plantation St.", "city": "Baytown", "p_code": "30314",
                  "country": "United States of America"}]
+    """
     for c in parse_csv(csv_filename):
         create_vcard(c)
