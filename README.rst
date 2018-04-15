@@ -18,7 +18,7 @@ Usage
 
 4. Import module ``from csv2vcard import csv2vcard``
 
-5. Now you have 2 options for running. Both will create an /export/ dir for your vCards.
+5. Now you have 2 options for running (both will create an /export/ dir for your vCard):
 
-  * Test the app with ``csv2vcard.test_csv2vcard()``. This will create a Forrest Gump test vCard.
-  * Use your real data ``csv2vcard.csv2vcard(yourfilename, ",")``. This will create all your vCards.
+- Test the app with ``csv2vcard.test_csv2vcard()``. This will create a Forrest Gump test vCard.
+- Use your real data ``csv2vcard.csv2vcard(yourfilename, ",")``. This will create all your vCards.
