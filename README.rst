@@ -15,13 +15,13 @@ Usage
 
 **Important: you should name the columns exactly the same way because they are used as keys to generate the vCards**
 
-2. ``cd yourcsvfoldername`` go to the folder where you have your csv file
+3. ``cd yourcsvfoldername`` go to the folder where you have your csv file
 
-3. Open python ``python3`` (gotcha: using Python 3.6 features)
+4. Open python ``python3`` (gotcha: using Python 3.6 features)
 
-4. Import module ``from csv2vcard import csv2vcard``
+5. Import module ``from csv2vcard import csv2vcard``
 
-5. Now you have 2 options for running (both will create an /export/ dir for your vCard):
+6. Now you have 2 options for running (both will create an /export/ dir for your vCard):
 
 - Test the app with ``csv2vcard.test_csv2vcard()``. This will create a Forrest Gump test vCard.
 - Use your real data ``csv2vcard.csv2vcard("yourcsvfilename", ",")`` where ","  is your csv delimeter. This will create all your vCards.
