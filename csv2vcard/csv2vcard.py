@@ -3,13 +3,13 @@ from csv2vcard.create_vcard import create_vcard
 from csv2vcard.parse_csv import parse_csv
 
 
-def csv2vcard(csv_filename: str):
+def csv2vcard(csv_filename: str, csv_delimeter: str):
     """
     Main function
     """
     check_export()
 
-    for c in parse_csv(csv_filename):
+    for c in parse_csv(csv_filename, csv_delimeter):
         vcard = create_vcard(c)
         export_vcard(vcard)
 
