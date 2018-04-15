@@ -4,7 +4,10 @@ A Python script that parses a .csv file of contacts and automatically creates vC
 
 Usage
 -----
-1. Create CSV table with contacts
+
+1. Install package with ``pip3 install csv2vcard``
+
+2. Create csv file with contacts
 
 *CSV file format (delimeter can be changed in csv_delimeter param, see below)*
 
@@ -12,7 +15,7 @@ Usage
 
 **Important: you should name the columns exactly the same way because they are used as keys to generate the vCards**
 
-2. ``git clone`` or download and ``cd`` to folder
+2. ``cd yourcsvfoldername`` go to the folder where you have your csv file
 
 3. Open python ``python3`` (gotcha: using Python 3.6 features)
 
@@ -21,4 +24,4 @@ Usage
 5. Now you have 2 options for running (both will create an /export/ dir for your vCard):
 
 - Test the app with ``csv2vcard.test_csv2vcard()``. This will create a Forrest Gump test vCard.
-- Use your real data ``csv2vcard.csv2vcard(yourfilename, ",")``. This will create all your vCards.
+- Use your real data ``csv2vcard.csv2vcard("yourcsvfilename", ",")`` where ","  is your csv delimeter. This will create all your vCards.

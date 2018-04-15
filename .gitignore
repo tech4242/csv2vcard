@@ -15,3 +15,5 @@ __pycache__/
 export
 dist
 MANIFEST
+build
+*egg-info
