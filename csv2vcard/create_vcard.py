@@ -5,6 +5,7 @@ def create_vcard(contact: dict):
     vc_begin = "BEGIN:VCARD\n"
     vc_version = "VERSION:3.0\n"
     vc_name = f"N;CHARSET=UTF-8:{contact.get('last_name', '')};{contact.get('first_name', '')};;;\n"
+    vc_fullname = f"FN;CHARSET=UTF-8:{contact.get('first_name', '')} {contact.get('last_name', '')}\n"
     vc_title = f"TITLE;CHARSET=UTF-8:{contact.get('title', '')}\n" if contact.get('title', '') != '' else ""
     vc_org = f"ORG;CHARSET=UTF-8:{contact.get('org', '')}\n" if contact.get('org', '') != '' else ""
     vc_phone = f"TEL;TYPE=WORK,VOICE:{contact.get('phone', '')}\n" if contact.get('phone', '') != '' else ""
