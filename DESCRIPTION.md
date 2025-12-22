@@ -1,16 +1,4 @@
-<div align="center">
-
 # csv2vcard
-
-[![Downloads](https://static.pepy.tech/badge/csv2vcard)](https://pepy.tech/projects/csv2vcard)
-[![PyPI](https://img.shields.io/pypi/v/csv2vcard.svg)](https://pypi.org/project/csv2vcard/)
-[![Python](https://img.shields.io/pypi/pyversions/csv2vcard.svg)](https://pypi.org/project/csv2vcard/)
-[![Typed](https://img.shields.io/badge/typed-py.typed-blue.svg)](https://peps.python.org/pep-0561/)
-[![Typer](https://img.shields.io/badge/CLI-Typer-2bbc8a.svg)](https://typer.tiangolo.com/)
-[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-[![License](https://img.shields.io/pypi/l/csv2vcard.svg)](https://github.com/tech4242/csv2vcard/blob/master/LICENSE.txt)
-
-</div>
 
 A Python library for converting CSV files to vCard format (3.0 and 4.0).
 
@@ -33,9 +21,6 @@ pip install csv2vcard
 
 # With CLI support
 pip install csv2vcard[cli]
-
-# Development installation
-pip install csv2vcard[dev]
 ```
 
 ## Quick Start
@@ -162,29 +147,6 @@ VCardVersion.V4_0  # vCard 4.0 (RFC 6350)
 
 - Python 3.9 or higher
 - For CLI: `typer` (installed with `csv2vcard[cli]`)
-
-## Development
-
-```bash
-# Clone the repository
-git clone https://github.com/tech4242/csv2vcard.git
-cd csv2vcard
-
-# Install dev dependencies
-pip install -e .[dev]
-
-# Run tests
-pytest
-
-# Run tests with coverage
-pytest --cov=csv2vcard --cov-report=term-missing
-
-# Type checking
-mypy csv2vcard
-
-# Linting
-ruff check csv2vcard
-```
 
 ## License
 
