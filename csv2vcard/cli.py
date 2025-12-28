@@ -1,7 +1,5 @@
 """Command-line interface for csv2vcard."""
 
-from __future__ import annotations
-
 import logging
 import sys
 from pathlib import Path
