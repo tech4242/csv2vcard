@@ -4,6 +4,7 @@
 
 [![Downloads](https://static.pepy.tech/badge/csv2vcard)](https://pepy.tech/projects/csv2vcard)
 [![PyPI](https://img.shields.io/pypi/v/csv2vcard.svg)](https://pypi.org/project/csv2vcard/)
+[![codecov](https://codecov.io/gh/tech4242/csv2vcard/graph/badge.svg?token=VUG1OXUH45)](https://codecov.io/gh/tech4242/csv2vcard)
 [![Python](https://img.shields.io/pypi/pyversions/csv2vcard.svg)](https://pypi.org/project/csv2vcard/)
 [![Typed](https://img.shields.io/badge/typed-py.typed-blue.svg)](https://peps.python.org/pep-0561/)
 [![Typer](https://img.shields.io/badge/CLI-Typer-2bbc8a.svg)](https://typer.tiangolo.com/)

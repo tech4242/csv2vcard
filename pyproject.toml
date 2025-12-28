@@ -68,6 +68,10 @@ line-length = 100
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP", "B", "C4", "SIM"]
 
+[tool.ruff.lint.per-file-ignores]
+# cli.py uses Optional[X] for Python 3.9 compatibility with Typer runtime type evaluation
+"csv2vcard/cli.py" = ["UP045"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-v --cov=csv2vcard --cov-report=term-missing"

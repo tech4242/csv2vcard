@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import sys
 from pathlib import Path
+from typing import Optional
 
 # Check if typer is available
 try:
@@ -62,7 +63,7 @@ if HAS_TYPER:
             ),
         ] = ",",
         output_dir: Annotated[
-            Path | None,
+            Optional[Path],
             typer.Option(
                 "--output",
                 "-o",
@@ -86,7 +87,7 @@ if HAS_TYPER:
             ),
         ] = False,
         mapping_file: Annotated[
-            Path | None,
+            Optional[Path],
             typer.Option(
                 "--mapping",
                 "-m",
@@ -94,7 +95,7 @@ if HAS_TYPER:
             ),
         ] = None,
         encoding: Annotated[
-            str | None,
+            Optional[str],
             typer.Option(
                 "--encoding",
                 "-e",
@@ -117,7 +118,7 @@ if HAS_TYPER:
             ),
         ] = False,
         version: Annotated[
-            bool | None,
+            Optional[bool],
             typer.Option(
                 "--version",
                 callback=version_callback,
@@ -177,7 +178,7 @@ if HAS_TYPER:
     @app.command()
     def test(
         output_dir: Annotated[
-            Path | None,
+            Optional[Path],
             typer.Option(
                 "--output",
                 "-o",
