@@ -8,9 +8,9 @@ import pytest
 
 # Only run CLI tests if typer is available
 typer = pytest.importorskip("typer")
-from typer.testing import CliRunner
+from typer.testing import CliRunner  # noqa: E402
 
-from csv2vcard.cli import app
+from csv2vcard.cli import app  # noqa: E402
 
 
 @pytest.fixture

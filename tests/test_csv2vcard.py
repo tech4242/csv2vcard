@@ -88,8 +88,14 @@ class TestCSV2VCard:
                 output_dir=output_dir,
             )
 
-            assert len(w) == 1
-            assert "deprecated" in str(w[0].message).lower()
+            # Filter for our specific deprecation warning
+            delimeter_warnings = [
+                x for x in w
+                if issubclass(x.category, DeprecationWarning)
+                and "csv_delimeter" in str(x.message)
+            ]
+            assert len(delimeter_warnings) == 1
+            assert "deprecated" in str(delimeter_warnings[0].message).lower()
             assert len(files) == 2
 
     def test_csv2vcard_returns_empty_for_nonexistent_file(

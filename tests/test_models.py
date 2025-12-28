@@ -143,7 +143,17 @@ class TestConstants:
     def test_all_fields(self) -> None:
         """Test ALL_FIELDS contains all expected fields."""
         expected = {
-            "last_name", "first_name", "title", "org", "phone",
-            "email", "website", "street", "city", "p_code", "country",
+            # Name components
+            "last_name", "first_name", "middle_name", "name_prefix", "name_suffix",
+            # Basic info
+            "nickname", "gender", "birthday", "anniversary",
+            # Contact
+            "phone", "email", "website",
+            # Organization
+            "org", "title", "role",
+            # Address
+            "street", "city", "region", "p_code", "country",
+            # Other
+            "note",
         }
-        assert ALL_FIELDS == expected
+        assert expected == ALL_FIELDS
