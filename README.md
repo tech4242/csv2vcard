@@ -4,6 +4,7 @@
 
 [![Downloads](https://static.pepy.tech/badge/csv2vcard)](https://pepy.tech/projects/csv2vcard)
 [![PyPI](https://img.shields.io/pypi/v/csv2vcard.svg)](https://pypi.org/project/csv2vcard/)
+[![codecov](https://codecov.io/gh/tech4242/csv2vcard/graph/badge.svg?token=VUG1OXUH45)](https://codecov.io/gh/tech4242/csv2vcard)
 [![Python](https://img.shields.io/pypi/pyversions/csv2vcard.svg)](https://pypi.org/project/csv2vcard/)
 [![Typed](https://img.shields.io/badge/typed-py.typed-blue.svg)](https://peps.python.org/pep-0561/)
 [![Typer](https://img.shields.io/badge/CLI-Typer-2bbc8a.svg)](https://typer.tiangolo.com/)
@@ -19,6 +20,10 @@ Create vCards from a spreadsheet of contacts - useful for business cards, QR cod
 ## Features
 
 - **vCard 3.0 and 4.0 support** - Generate either format
+- **Custom CSV mapping** - Map any CSV column names to vCard fields
+- **Batch processing** - Convert entire directories of CSV files
+- **Single-file output** - Combine all contacts into one .vcf file
+- **Auto-detect encoding** - Handles various file encodings
 - **Command-line interface** - Convert files directly from terminal
 - **Library API** - Use programmatically in your Python code
 - **Type hints** - Full typing support for IDE autocomplete
@@ -34,8 +39,11 @@ pip install csv2vcard
 # With CLI support
 pip install csv2vcard[cli]
 
-# Development installation
-pip install csv2vcard[dev]
+# With encoding detection
+pip install csv2vcard[encoding]
+
+# Full installation
+pip install csv2vcard[all]
 ```
 
 ## Quick Start
@@ -49,8 +57,17 @@ csv2vcard convert contacts.csv
 # Specify output directory and vCard version
 csv2vcard convert contacts.csv -o ./vcards -V 4.0
 
-# Use semicolon delimiter
-csv2vcard convert contacts.csv -d ";"
+# Convert all CSVs in a directory
+csv2vcard convert ./csv_folder/
+
+# Export all contacts to a single file
+csv2vcard convert contacts.csv --single-vcard
+
+# Use custom column mapping
+csv2vcard convert data.csv -m mapping.json
+
+# Show example mapping file
+csv2vcard mapping
 
 # Create a test vCard (Forrest Gump)
 csv2vcard test
@@ -72,7 +89,12 @@ csv2vcard(
     ",",
     output_dir="./vcards",
     version=VCardVersion.V4_0,
+    single_file=True,  # All contacts in one file
+    mapping_file="mapping.json",  # Custom column names
 )
+
+# Convert entire directory
+csv2vcard("./csv_folder/", ",", output_dir="./vcards")
 
 # Test with sample contact
 test_csv2vcard()
@@ -80,33 +102,59 @@ test_csv2vcard()
 
 ## CSV Format
 
-Your CSV file should have these column headers:
+Your CSV file should have column headers that match vCard fields. Use the default names or create a custom mapping.
+
+### Default Column Names
 
 ```
-last_name,first_name,title,org,phone,email,website,street,city,p_code,country
+last_name,first_name,middle_name,name_prefix,name_suffix,nickname,gender,birthday,anniversary,phone,email,website,org,title,role,street,city,region,p_code,country,note
 ```
 
-**Required columns:** `last_name`, `first_name`
+**Required:** `last_name`, `first_name`
 
-**Optional columns:** `title`, `org`, `phone`, `email`, `website`, `street`, `city`, `p_code`, `country`
+**Optional:** All other fields
 
 ### Example CSV
 
 ```csv
-last_name,first_name,title,org,phone,email,website,street,city,p_code,country
-Gump,Forrest,Shrimp Man,Bubba Gump Shrimp Co.,+1234567890,forrest@example.com,https://example.com,42 Plantation St.,Baytown,30314,USA
-Doe,Jane,Developer,Tech Corp,+0987654321,jane@example.com,https://jane.dev,123 Main St.,New York,10001,USA
+last_name,first_name,title,org,phone,email,street,city,p_code,country,birthday,note
+Gump,Forrest,Shrimp Man,Bubba Gump Shrimp Co.,+1234567890,forrest@example.com,42 Plantation St.,Baytown,30314,USA,1944-06-06,Life is like a box of chocolates
+Doe,Jane,Developer,Tech Corp,+0987654321,jane@example.com,123 Main St.,New York,10001,USA,,
+```
+
+### Custom Column Mapping
+
+Create a JSON file to map your CSV column names to vCard fields:
+
+```json
+{
+  "first_name": ["Given Name", "FirstName", "First"],
+  "last_name": ["Surname", "FamilyName", "Last"],
+  "email": ["Email Address", "E-Mail"],
+  "phone": ["Phone Number", "Mobile", "Tel"]
+}
+```
+
+Then use it:
+```bash
+csv2vcard convert data.csv -m mapping.json
 ```
 
 ## CLI Reference
 
 ```
-csv2vcard convert [OPTIONS] CSV_FILE
+csv2vcard convert [OPTIONS] SOURCE
+
+Arguments:
+  SOURCE  Path to CSV file or directory containing CSV files
 
 Options:
   -d, --delimiter TEXT      CSV field delimiter (default: ",")
   -o, --output PATH         Output directory (default: ./export/)
   -V, --vcard-version TEXT  vCard version: 3.0 or 4.0 (default: 3.0)
+  -1, --single-vcard        Export all contacts to a single .vcf file
+  -m, --mapping PATH        Path to JSON mapping file
+  -e, --encoding TEXT       CSV file encoding (auto-detected if not set)
   --strict                  Exit on validation errors
   -v, --verbose             Enable verbose output
   --version                 Show version and exit
@@ -123,11 +171,14 @@ from csv2vcard.models import VCardVersion
 
 # Convert CSV to vCards
 files = csv2vcard(
-    csv_filename,           # Path to CSV file
+    csv_filename,           # Path to CSV file or directory
     csv_delimiter=",",      # Field delimiter
     output_dir=None,        # Output directory (default: ./export/)
     version=VCardVersion.V3_0,  # vCard version
     strict=False,           # Raise on validation errors
+    single_file=False,      # Combine all contacts into one file
+    encoding=None,          # File encoding (auto-detected)
+    mapping_file=None,      # Path to JSON mapping file
 )
 # Returns: List[Path] of created vCard files
 
@@ -147,7 +198,11 @@ from csv2vcard.models import Contact, VCardVersion, VCardOutput
 contact = Contact(
     last_name="Doe",
     first_name="John",
+    middle_name="William",
     email="john@example.com",
+    phone="+1234567890",
+    birthday="1990-01-15",
+    nickname="Johnny",
 )
 
 # Or from a dictionary
@@ -158,10 +213,37 @@ VCardVersion.V3_0  # vCard 3.0 (RFC 2426)
 VCardVersion.V4_0  # vCard 4.0 (RFC 6350)
 ```
 
+## Supported vCard Fields
+
+| Field | Description | Example |
+|-------|-------------|---------|
+| `last_name` | Family name | Doe |
+| `first_name` | Given name | John |
+| `middle_name` | Middle name | William |
+| `name_prefix` | Honorific prefix | Dr. |
+| `name_suffix` | Honorific suffix | Jr. |
+| `nickname` | Nickname | Johnny |
+| `gender` | Gender (M/F/O/N/U) | M |
+| `birthday` | Birth date (YYYY-MM-DD) | 1990-01-15 |
+| `anniversary` | Anniversary date | 2015-06-20 |
+| `phone` | Phone number | +1234567890 |
+| `email` | Email address | john@example.com |
+| `website` | Website URL | https://example.com |
+| `org` | Organization | Acme Corp |
+| `title` | Job title | Developer |
+| `role` | Role/function | Team Lead |
+| `street` | Street address | 123 Main St |
+| `city` | City | New York |
+| `region` | State/province | NY |
+| `p_code` | Postal code | 10001 |
+| `country` | Country | USA |
+| `note` | Notes | Any additional info |
+
 ## Requirements
 
 - Python 3.9 or higher
 - For CLI: `typer` (installed with `csv2vcard[cli]`)
+- For encoding detection: `charset-normalizer` (installed with `csv2vcard[encoding]`)
 
 ## Development
 

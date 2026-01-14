@@ -8,9 +8,9 @@ import pytest
 
 # Only run CLI tests if typer is available
 typer = pytest.importorskip("typer")
-from typer.testing import CliRunner
+from typer.testing import CliRunner  # noqa: E402
 
-from csv2vcard.cli import app
+from csv2vcard.cli import app  # noqa: E402
 
 
 @pytest.fixture
@@ -181,4 +181,5 @@ class TestCLI:
 
         assert result.exit_code == 0
         assert "CSV file" in result.stdout
-        assert "--delimiter" in result.stdout
+        # Check for "delimiter" without dashes due to ANSI escape codes in rich output
+        assert "delimiter" in result.stdout

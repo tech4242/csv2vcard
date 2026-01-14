@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import tempfile
+from collections.abc import Generator
 from pathlib import Path
-from typing import Dict, Generator
 
 import pytest
 
@@ -17,7 +17,7 @@ def temp_dir() -> Generator[Path, None, None]:
 
 
 @pytest.fixture
-def sample_contact() -> Dict[str, str]:
+def sample_contact() -> dict[str, str]:
     """Return a sample contact dictionary with all fields populated."""
     return {
         "last_name": "Gump",
@@ -35,7 +35,7 @@ def sample_contact() -> Dict[str, str]:
 
 
 @pytest.fixture
-def minimal_contact() -> Dict[str, str]:
+def minimal_contact() -> dict[str, str]:
     """Return a minimal contact with only required fields."""
     return {
         "last_name": "Doe",
@@ -46,9 +46,9 @@ def minimal_contact() -> Dict[str, str]:
 @pytest.fixture
 def sample_csv(temp_dir: Path) -> Path:
     """Create a sample CSV file with valid contacts."""
-    csv_content = """last_name,first_name,title,org,phone,email,website,street,city,p_code,country
-Gump,Forrest,Shrimp Man,Bubba Gump Shrimp Co.,+1234567890,forrest@example.com,https://example.com,42 Plantation St.,Baytown,30314,USA
-Doe,Jane,Developer,Tech Corp,+0987654321,jane@example.com,https://jane.dev,123 Main St.,New York,10001,USA
+    csv_content = """last_name,first_name,title,org,phone,email,street,city,p_code,country
+Gump,Forrest,Shrimp Man,Bubba Gump,+1234567890,forrest@ex.com,42 Main,Baytown,30314,USA
+Doe,Jane,Developer,Tech Corp,+0987654321,jane@ex.com,123 Main St.,NYC,10001,USA
 """
     csv_path = temp_dir / "contacts.csv"
     csv_path.write_text(csv_content, encoding="utf-8")
@@ -59,8 +59,8 @@ Doe,Jane,Developer,Tech Corp,+0987654321,jane@example.com,https://jane.dev,123 M
 def unicode_csv(temp_dir: Path) -> Path:
     """Create a CSV file with Unicode characters."""
     csv_content = """last_name,first_name,title,org,phone,email,website,street,city,p_code,country
-Mueller,Hans,Ingenieur,Firma GmbH,+49123456,hans@example.de,https://example.de,Strasse 1,Munchen,80331,Deutschland
-Dupont,Marie,Directrice,Societe SA,+33123456,marie@example.fr,https://example.fr,Rue de la Paix,Paris,75001,France
+Mueller,Hans,Ingenieur,Firma GmbH,+49123456,hans@ex.de,https://ex.de,Strasse 1,Munchen,80331,DE
+Dupont,Marie,Directrice,Societe SA,+33123456,marie@ex.fr,https://ex.fr,Rue Paix,Paris,75001,FR
 """
     csv_path = temp_dir / "unicode_contacts.csv"
     csv_path.write_text(csv_content, encoding="utf-8")

@@ -1,10 +1,9 @@
 """Command-line interface for csv2vcard."""
 
-from __future__ import annotations
-
 import logging
 import sys
 from pathlib import Path
+from typing import Optional
 
 # Check if typer is available
 try:
@@ -29,6 +28,7 @@ if HAS_TYPER:
     from csv2vcard import __version__
     from csv2vcard.csv2vcard import csv2vcard as csv2vcard_func
     from csv2vcard.csv2vcard import test_csv2vcard as test_csv2vcard_func
+    from csv2vcard.mapping import create_example_mapping
     from csv2vcard.models import VCardVersion
 
     app = typer.Typer(
@@ -45,12 +45,11 @@ if HAS_TYPER:
 
     @app.command()
     def convert(
-        csv_file: Annotated[
+        source: Annotated[
             Path,
             typer.Argument(
-                help="Path to the CSV file to convert",
+                help="Path to CSV file or directory containing CSV files",
                 exists=True,
-                readable=True,
             ),
         ],
         delimiter: Annotated[
@@ -62,7 +61,7 @@ if HAS_TYPER:
             ),
         ] = ",",
         output_dir: Annotated[
-            Path | None,
+            Optional[Path],
             typer.Option(
                 "--output",
                 "-o",
@@ -77,6 +76,30 @@ if HAS_TYPER:
                 help="vCard version to generate: 3.0 or 4.0",
             ),
         ] = "3.0",
+        single_file: Annotated[
+            bool,
+            typer.Option(
+                "--single-vcard",
+                "-1",
+                help="Export all contacts to a single .vcf file",
+            ),
+        ] = False,
+        mapping_file: Annotated[
+            Optional[Path],
+            typer.Option(
+                "--mapping",
+                "-m",
+                help="Path to JSON mapping file for custom CSV column names",
+            ),
+        ] = None,
+        encoding: Annotated[
+            Optional[str],
+            typer.Option(
+                "--encoding",
+                "-e",
+                help="CSV file encoding (auto-detected if not specified)",
+            ),
+        ] = None,
         strict: Annotated[
             bool,
             typer.Option(
@@ -93,7 +116,7 @@ if HAS_TYPER:
             ),
         ] = False,
         version: Annotated[
-            bool | None,
+            Optional[bool],
             typer.Option(
                 "--version",
                 callback=version_callback,
@@ -103,10 +126,17 @@ if HAS_TYPER:
         ] = None,
     ) -> None:
         """
-        Convert a CSV file to vCard files.
+        Convert CSV file(s) to vCard files.
 
-        Example:
+        Examples:
+
+            csv2vcard convert contacts.csv
+
             csv2vcard convert contacts.csv -d ";" -o ./vcards -V 4.0
+
+            csv2vcard convert ./csv_folder/ --single-vcard -o ./output
+
+            csv2vcard convert data.csv -m mapping.json
         """
         # Configure logging
         log_level = logging.DEBUG if verbose else logging.INFO
@@ -124,11 +154,14 @@ if HAS_TYPER:
 
         try:
             files = csv2vcard_func(
-                csv_file,
+                source,
                 delimiter,
                 output_dir=output_dir,
                 version=vc_version,
                 strict=strict,
+                single_file=single_file,
+                encoding=encoding,
+                mapping_file=mapping_file,
             )
             if files:
                 typer.echo(f"Successfully created {len(files)} vCard file(s).")
@@ -143,7 +176,7 @@ if HAS_TYPER:
     @app.command()
     def test(
         output_dir: Annotated[
-            Path | None,
+            Optional[Path],
             typer.Option(
                 "--output",
                 "-o",
@@ -172,6 +205,17 @@ if HAS_TYPER:
 
         test_csv2vcard_func(output_dir=output_dir, version=vc_version)
         typer.echo("Test vCard created successfully.")
+
+    @app.command(name="mapping")
+    def show_mapping() -> None:
+        """
+        Show an example mapping file for custom CSV columns.
+
+        The mapping file is a JSON file that maps vCard fields to
+        possible CSV column names. Copy this output to a .json file
+        and customize for your CSV format.
+        """
+        typer.echo(create_example_mapping())
 
 else:
     # Fallback app when Typer is not installed

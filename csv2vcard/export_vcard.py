@@ -99,6 +99,48 @@ def ensure_export_dir(output_dir: str | Path | None = None) -> Path:
     return export_path
 
 
+def export_vcards_combined(
+    vcards: list[dict[str, str] | VCardOutput],
+    output_path: str | Path,
+) -> Path:
+    """
+    Export multiple vCards to a single .vcf file.
+
+    Args:
+        vcards: List of vCard data (dicts or VCardOutput objects)
+        output_path: Full path to the output file (including filename)
+
+    Returns:
+        Path to the created file
+
+    Raises:
+        ExportError: If export fails
+    """
+    output_file = Path(output_path)
+
+    # Ensure parent directory exists
+    ensure_export_dir(output_file.parent)
+
+    # Collect all vCard outputs
+    outputs: list[str] = []
+    for vcard in vcards:
+        if isinstance(vcard, VCardOutput):
+            outputs.append(vcard.output)
+        else:
+            outputs.append(vcard["output"])
+
+    # Combine with newlines (each vCard already ends with newline)
+    combined = "".join(outputs)
+
+    try:
+        output_file.write_text(combined, encoding="utf-8")
+        logger.info(f"Created combined vCard with {len(vcards)} contacts: {output_file}")
+        return output_file
+    except OSError as e:
+        logger.error(f"Failed to write combined vCard: {e}")
+        raise ExportError(f"Failed to export combined vCard: {e}") from e
+
+
 # Legacy function for backwards compatibility
 def check_export() -> None:
     """
