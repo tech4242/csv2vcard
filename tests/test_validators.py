@@ -11,6 +11,9 @@ from csv2vcard.validators import (
     sanitize_filename,
     validate_contact,
     validate_csv_file,
+    validate_email,
+    validate_gender,
+    validate_geo,
     validate_output_directory,
 )
 
@@ -189,3 +192,135 @@ class TestSanitizeFilename:
         """Test that underscores are allowed."""
         result = sanitize_filename("John_Doe")
         assert result == "john_doe"
+
+
+class TestValidateEmail:
+    """Test suite for validate_email function (v0.5.0)."""
+
+    def test_valid_email_simple(self) -> None:
+        """Test simple valid email."""
+        assert validate_email("user@example.com") is True
+
+    def test_valid_email_with_plus(self) -> None:
+        """Test email with plus sign."""
+        assert validate_email("user+tag@example.com") is True
+
+    def test_valid_email_subdomain(self) -> None:
+        """Test email with subdomain."""
+        assert validate_email("user@mail.example.com") is True
+
+    def test_invalid_email_no_at(self) -> None:
+        """Test email without @ sign."""
+        assert validate_email("userexample.com") is False
+
+    def test_invalid_email_no_domain(self) -> None:
+        """Test email without domain."""
+        assert validate_email("user@") is False
+
+    def test_invalid_email_no_tld(self) -> None:
+        """Test email without TLD."""
+        assert validate_email("user@example") is False
+
+    def test_empty_email(self) -> None:
+        """Test empty email."""
+        assert validate_email("") is False
+
+
+class TestValidateGender:
+    """Test suite for validate_gender function (v0.5.0)."""
+
+    def test_valid_male_letter(self) -> None:
+        """Test valid M gender code."""
+        assert validate_gender("M") is True
+
+    def test_valid_female_letter(self) -> None:
+        """Test valid F gender code."""
+        assert validate_gender("F") is True
+
+    def test_valid_other_letter(self) -> None:
+        """Test valid O gender code."""
+        assert validate_gender("O") is True
+
+    def test_valid_none_letter(self) -> None:
+        """Test valid N gender code."""
+        assert validate_gender("N") is True
+
+    def test_valid_unknown_letter(self) -> None:
+        """Test valid U gender code."""
+        assert validate_gender("U") is True
+
+    def test_valid_male_word(self) -> None:
+        """Test 'Male' as valid gender."""
+        assert validate_gender("Male") is True
+
+    def test_valid_female_word(self) -> None:
+        """Test 'Female' as valid gender."""
+        assert validate_gender("Female") is True
+
+    def test_case_insensitive(self) -> None:
+        """Test case insensitivity."""
+        assert validate_gender("m") is True
+        assert validate_gender("FEMALE") is True
+
+    def test_invalid_gender(self) -> None:
+        """Test invalid gender value."""
+        assert validate_gender("X") is False
+        assert validate_gender("invalid") is False
+
+    def test_empty_gender(self) -> None:
+        """Test empty gender."""
+        assert validate_gender("") is False
+
+
+class TestValidateGeo:
+    """Test suite for validate_geo function (v0.5.0)."""
+
+    def test_valid_coordinates_comma(self) -> None:
+        """Test valid coordinates with comma separator."""
+        assert validate_geo("37.386013,-122.082932") is True
+
+    def test_valid_coordinates_semicolon(self) -> None:
+        """Test valid coordinates with semicolon separator (vCard 3.0)."""
+        assert validate_geo("37.386013;-122.082932") is True
+
+    def test_valid_coordinates_with_spaces(self) -> None:
+        """Test coordinates with spaces."""
+        assert validate_geo("37.386013, -122.082932") is True
+
+    def test_valid_coordinates_at_boundaries(self) -> None:
+        """Test coordinates at valid boundaries."""
+        assert validate_geo("90.0,180.0") is True
+        assert validate_geo("-90.0,-180.0") is True
+        assert validate_geo("0,0") is True
+
+    def test_invalid_latitude_too_high(self) -> None:
+        """Test latitude exceeding 90."""
+        assert validate_geo("91.0,0.0") is False
+
+    def test_invalid_latitude_too_low(self) -> None:
+        """Test latitude below -90."""
+        assert validate_geo("-91.0,0.0") is False
+
+    def test_invalid_longitude_too_high(self) -> None:
+        """Test longitude exceeding 180."""
+        assert validate_geo("0.0,181.0") is False
+
+    def test_invalid_longitude_too_low(self) -> None:
+        """Test longitude below -180."""
+        assert validate_geo("0.0,-181.0") is False
+
+    def test_invalid_format_not_numbers(self) -> None:
+        """Test non-numeric coordinates."""
+        assert validate_geo("abc,def") is False
+
+    def test_invalid_format_single_value(self) -> None:
+        """Test single value instead of pair."""
+        assert validate_geo("37.386013") is False
+
+    def test_invalid_format_three_values(self) -> None:
+        """Test three values."""
+        assert validate_geo("37.386013,-122.082932,100") is False
+
+    def test_empty_geo(self) -> None:
+        """Test empty geo string."""
+        assert validate_geo("") is False

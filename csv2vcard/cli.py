@@ -100,6 +100,28 @@ if HAS_TYPER:
                 help="CSV file encoding (auto-detected if not specified)",
             ),
         ] = None,
+        strip_accents_opt: Annotated[
+            bool,
+            typer.Option(
+                "--strip-accents",
+                "-a",
+                help="Remove accents/diacritics from contact fields",
+            ),
+        ] = False,
+        max_file_size: Annotated[
+            Optional[int],
+            typer.Option(
+                "--max-vcard-file-size",
+                help="Maximum file size in bytes for split output files",
+            ),
+        ] = None,
+        max_vcards_per_file: Annotated[
+            Optional[int],
+            typer.Option(
+                "--max-vcards-per-file",
+                help="Maximum number of vCards per output file",
+            ),
+        ] = None,
         strict: Annotated[
             bool,
             typer.Option(
@@ -137,6 +159,10 @@ if HAS_TYPER:
             csv2vcard convert ./csv_folder/ --single-vcard -o ./output
 
             csv2vcard convert data.csv -m mapping.json
+
+            csv2vcard convert data.csv --strip-accents
+
+            csv2vcard convert data.csv --max-vcards-per-file 100
         """
         # Configure logging
         log_level = logging.DEBUG if verbose else logging.INFO
@@ -162,6 +188,9 @@ if HAS_TYPER:
                 single_file=single_file,
                 encoding=encoding,
                 mapping_file=mapping_file,
+                strip_accents=strip_accents_opt,
+                max_file_size=max_file_size,
+                max_vcards_per_file=max_vcards_per_file,
             )
             if files:
                 typer.echo(f"Successfully created {len(files)} vCard file(s).")

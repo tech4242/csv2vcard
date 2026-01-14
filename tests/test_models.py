@@ -147,12 +147,22 @@ class TestConstants:
             "last_name", "first_name", "middle_name", "name_prefix", "name_suffix",
             # Basic info
             "nickname", "gender", "birthday", "anniversary",
-            # Contact
+            # Contact - single (backwards compatible)
             "phone", "email", "website",
+            # Contact - multi-type phone (v0.5.0)
+            "phone_cell", "phone_home", "phone_work", "phone_fax",
+            # Contact - multi-type email (v0.5.0)
+            "email_home", "email_work",
             # Organization
             "org", "title", "role",
-            # Address
+            # Address (default/work)
             "street", "city", "region", "p_code", "country",
+            # Address - home (v0.5.0)
+            "home_street", "home_city", "home_region", "home_p_code", "home_country",
+            # Media (v0.5.0)
+            "photo", "logo",
+            # New vCard fields (v0.5.0)
+            "categories", "geo", "tz", "key",
             # Other
             "note",
         }
