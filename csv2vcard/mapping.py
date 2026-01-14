@@ -23,20 +23,49 @@ DEFAULT_MAPPING: dict[str, list[str]] = {
     "gender": ["gender", "sex"],
     "birthday": ["birthday", "birthdate", "birth_date", "dob", "date_of_birth", "bday"],
     "anniversary": ["anniversary", "wedding_anniversary", "wedding_date"],
-    # Contact
+    # Contact - single (backwards compatible)
     "phone": ["phone", "telephone", "tel", "mobile", "cell", "cellphone", "phone_number"],
     "email": ["email", "e-mail", "email_address", "mail"],
     "website": ["website", "url", "web", "homepage", "webpage", "site"],
+    # Contact - multi-type phone (v0.5.0)
+    "phone_cell": ["phone_cell", "cell_phone", "mobile_phone", "mobile"],
+    "phone_home": ["phone_home", "home_phone", "personal_phone"],
+    "phone_work": ["phone_work", "work_phone", "business_phone", "office_phone"],
+    "phone_fax": ["phone_fax", "fax", "fax_number"],
+    # Contact - multi-type email (v0.5.0)
+    "email_home": ["email_home", "home_email", "personal_email"],
+    "email_work": ["email_work", "work_email", "business_email", "office_email"],
     # Organization
     "org": ["org", "organization", "organisation", "company", "employer", "business"],
     "title": ["title", "job_title", "jobtitle", "position"],
     "role": ["role", "job_role", "function", "occupation"],
-    # Address
-    "street": ["street", "street_address", "address", "address1", "street1"],
-    "city": ["city", "locality", "town"],
-    "region": ["region", "state", "province", "county", "state_province"],
+    # Address (default/work)
+    "street": ["street", "street_address", "address", "address1", "street1", "work_street"],
+    "city": ["city", "locality", "town", "work_city"],
+    "region": ["region", "state", "province", "county", "state_province", "work_state"],
     "p_code": ["p_code", "postal_code", "postalcode", "zip", "zipcode", "zip_code", "postcode"],
-    "country": ["country", "country_name", "nation"],
+    "country": ["country", "country_name", "nation", "work_country"],
+    # Address - home (v0.5.0)
+    # Support both "home_street" and "street_home" naming conventions
+    "home_street": [
+        "home_street", "street_home", "home_address", "personal_street", "home_street_address",
+    ],
+    "home_city": ["home_city", "city_home", "personal_city"],
+    "home_region": [
+        "home_region", "region_home", "home_state", "state_home", "home_province", "personal_state",
+    ],
+    "home_p_code": [
+        "home_p_code", "p_code_home", "home_postal_code", "home_zip", "zip_home", "personal_zip",
+    ],
+    "home_country": ["home_country", "country_home", "personal_country"],
+    # Media (v0.5.0)
+    "photo": ["photo", "picture", "image", "avatar", "photo_url"],
+    "logo": ["logo", "company_logo", "org_logo", "logo_url"],
+    # New vCard fields (v0.5.0)
+    "categories": ["categories", "category", "tags", "groups", "labels"],
+    "geo": ["geo", "coordinates", "location", "lat_lon", "gps"],
+    "tz": ["tz", "timezone", "time_zone"],
+    "key": ["key", "public_key", "pgp_key", "gpg_key"],
     # Other
     "note": ["note", "notes", "comment", "comments", "remarks", "description"],
 }

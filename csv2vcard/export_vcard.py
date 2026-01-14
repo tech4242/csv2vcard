@@ -141,6 +141,97 @@ def export_vcards_combined(
         raise ExportError(f"Failed to export combined vCard: {e}") from e
 
 
+def export_vcards_split(
+    vcards: list[dict[str, str] | VCardOutput],
+    output_dir: str | Path,
+    base_filename: str = "contacts",
+    max_file_size: int | None = None,
+    max_vcards_per_file: int | None = None,
+) -> list[Path]:
+    """
+    Export vCards to multiple files, splitting by size or count.
+
+    Args:
+        vcards: List of vCard data (dicts or VCardOutput objects)
+        output_dir: Output directory
+        base_filename: Base name for output files (without extension)
+        max_file_size: Maximum file size in bytes (approximate)
+        max_vcards_per_file: Maximum number of vCards per file
+
+    Returns:
+        List of paths to created files
+
+    Raises:
+        ExportError: If export fails
+        ValueError: If neither max_file_size nor max_vcards_per_file specified
+    """
+    if max_file_size is None and max_vcards_per_file is None:
+        raise ValueError("Either max_file_size or max_vcards_per_file must be specified")
+
+    output_path = Path(output_dir)
+    ensure_export_dir(output_path)
+
+    # Extract vCard outputs
+    outputs: list[str] = []
+    for vcard in vcards:
+        if isinstance(vcard, VCardOutput):
+            outputs.append(vcard.output)
+        else:
+            outputs.append(vcard["output"])
+
+    created_files: list[Path] = []
+    current_chunk: list[str] = []
+    current_size = 0
+    file_index = 1
+
+    def write_chunk() -> None:
+        nonlocal current_chunk, current_size, file_index
+        if not current_chunk:
+            return
+
+        filename = f"{base_filename}_{file_index:03d}.vcf"
+        output_file = output_path / filename
+        combined = "".join(current_chunk)
+
+        try:
+            output_file.write_text(combined, encoding="utf-8")
+            created_files.append(output_file)
+            logger.info(f"Created split vCard with {len(current_chunk)} contacts: {output_file}")
+        except OSError as e:
+            raise ExportError(f"Failed to write vCard file: {e}") from e
+
+        current_chunk = []
+        current_size = 0
+        file_index += 1
+
+    for output in outputs:
+        vcard_size = len(output.encode("utf-8"))
+
+        # Check if we need to start a new file
+        should_split = False
+
+        if max_vcards_per_file is not None and len(current_chunk) >= max_vcards_per_file:
+            should_split = True
+
+        if (max_file_size is not None
+                and current_size + vcard_size > max_file_size
+                and current_chunk):
+            # Only split if we have at least one vCard in the chunk
+            should_split = True
+
+        if should_split:
+            write_chunk()
+
+        current_chunk.append(output)
+        current_size += vcard_size
+
+    # Write any remaining vCards
+    write_chunk()
+
+    logger.info(f"Created {len(created_files)} split vCard file(s)")
+    return created_files
+
+
 # Legacy function for backwards compatibility
 def check_export() -> None:
     """
