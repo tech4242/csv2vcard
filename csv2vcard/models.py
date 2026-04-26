@@ -19,7 +19,7 @@ class VCardVersion(Enum):
 # Required fields that must be present for a valid contact
 REQUIRED_FIELDS: frozenset[str] = frozenset({"last_name", "first_name"})
 
-# All supported contact fields (v0.4.0 expanded)
+# All supported contact fields (v0.5.0 expanded)
 ALL_FIELDS: frozenset[str] = frozenset({
     # Name components
     "last_name",
@@ -32,20 +32,42 @@ ALL_FIELDS: frozenset[str] = frozenset({
     "gender",
     "birthday",
     "anniversary",
-    # Contact
+    # Contact - single (backwards compatible)
     "phone",
     "email",
     "website",
+    # Contact - multi-type phone (v0.5.0)
+    "phone_cell",
+    "phone_home",
+    "phone_work",
+    "phone_fax",
+    # Contact - multi-type email (v0.5.0)
+    "email_home",
+    "email_work",
     # Organization
     "org",
     "title",
     "role",
-    # Address
+    # Address (default/work)
     "street",
     "city",
     "region",
     "p_code",
     "country",
+    # Address - home (v0.5.0)
+    "home_street",
+    "home_city",
+    "home_region",
+    "home_p_code",
+    "home_country",
+    # Media (v0.5.0)
+    "photo",  # URL or base64-encoded image
+    "logo",   # URL or base64-encoded image
+    # New vCard fields (v0.5.0)
+    "categories",  # Comma-separated list
+    "geo",         # latitude,longitude
+    "tz",          # Timezone
+    "key",         # Public key URL or base64
     # Other
     "note",
 })
@@ -68,22 +90,49 @@ class Contact:
     birthday: str = ""  # YYYY-MM-DD or YYYYMMDD
     anniversary: str = ""  # YYYY-MM-DD or YYYYMMDD
 
-    # Contact
+    # Contact - single (backwards compatible)
     phone: str = ""
     email: str = ""
     website: str = ""
+
+    # Contact - multi-type phone (v0.5.0)
+    phone_cell: str = ""
+    phone_home: str = ""
+    phone_work: str = ""
+    phone_fax: str = ""
+
+    # Contact - multi-type email (v0.5.0)
+    email_home: str = ""
+    email_work: str = ""
 
     # Organization
     org: str = ""
     title: str = ""
     role: str = ""
 
-    # Address (ADR field)
+    # Address (default/work ADR field)
     street: str = ""
     city: str = ""
     region: str = ""  # state/province
     p_code: str = ""
     country: str = ""
+
+    # Address - home (v0.5.0)
+    home_street: str = ""
+    home_city: str = ""
+    home_region: str = ""
+    home_p_code: str = ""
+    home_country: str = ""
+
+    # Media (v0.5.0)
+    photo: str = ""  # URL or base64-encoded image
+    logo: str = ""   # URL or base64-encoded image
+
+    # New vCard fields (v0.5.0)
+    categories: str = ""  # Comma-separated list
+    geo: str = ""         # latitude,longitude (e.g., "37.386013,-122.082932")
+    tz: str = ""          # Timezone (e.g., "-05:00" or "America/New_York")
+    key: str = ""         # Public key URL or base64
 
     # Other
     note: str = ""
@@ -119,20 +168,42 @@ class Contact:
             gender=data.get("gender", ""),
             birthday=data.get("birthday", ""),
             anniversary=data.get("anniversary", ""),
-            # Contact
+            # Contact - single
             phone=data.get("phone", ""),
             email=data.get("email", ""),
             website=data.get("website", ""),
+            # Contact - multi-type phone (v0.5.0)
+            phone_cell=data.get("phone_cell", ""),
+            phone_home=data.get("phone_home", ""),
+            phone_work=data.get("phone_work", ""),
+            phone_fax=data.get("phone_fax", ""),
+            # Contact - multi-type email (v0.5.0)
+            email_home=data.get("email_home", ""),
+            email_work=data.get("email_work", ""),
             # Organization
             org=data.get("org", ""),
             title=data.get("title", ""),
             role=data.get("role", ""),
-            # Address
+            # Address (default/work)
             street=data.get("street", ""),
             city=data.get("city", ""),
             region=data.get("region", ""),
             p_code=data.get("p_code", ""),
             country=data.get("country", ""),
+            # Address - home (v0.5.0)
+            home_street=data.get("home_street", ""),
+            home_city=data.get("home_city", ""),
+            home_region=data.get("home_region", ""),
+            home_p_code=data.get("home_p_code", ""),
+            home_country=data.get("home_country", ""),
+            # Media (v0.5.0)
+            photo=data.get("photo", ""),
+            logo=data.get("logo", ""),
+            # New vCard fields (v0.5.0)
+            categories=data.get("categories", ""),
+            geo=data.get("geo", ""),
+            tz=data.get("tz", ""),
+            key=data.get("key", ""),
             # Other
             note=data.get("note", ""),
         )
@@ -156,20 +227,42 @@ class Contact:
             "gender": self.gender,
             "birthday": self.birthday,
             "anniversary": self.anniversary,
-            # Contact
+            # Contact - single
             "phone": self.phone,
             "email": self.email,
             "website": self.website,
+            # Contact - multi-type phone (v0.5.0)
+            "phone_cell": self.phone_cell,
+            "phone_home": self.phone_home,
+            "phone_work": self.phone_work,
+            "phone_fax": self.phone_fax,
+            # Contact - multi-type email (v0.5.0)
+            "email_home": self.email_home,
+            "email_work": self.email_work,
             # Organization
             "org": self.org,
             "title": self.title,
             "role": self.role,
-            # Address
+            # Address (default/work)
             "street": self.street,
             "city": self.city,
             "region": self.region,
             "p_code": self.p_code,
             "country": self.country,
+            # Address - home (v0.5.0)
+            "home_street": self.home_street,
+            "home_city": self.home_city,
+            "home_region": self.home_region,
+            "home_p_code": self.home_p_code,
+            "home_country": self.home_country,
+            # Media (v0.5.0)
+            "photo": self.photo,
+            "logo": self.logo,
+            # New vCard fields (v0.5.0)
+            "categories": self.categories,
+            "geo": self.geo,
+            "tz": self.tz,
+            "key": self.key,
             # Other
             "note": self.note,
         }

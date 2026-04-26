@@ -11,6 +11,12 @@ from csv2vcard.models import REQUIRED_FIELDS
 
 logger = logging.getLogger(__name__)
 
+# Valid vCard 4.0 gender values (single character)
+VALID_GENDER_VALUES = frozenset({"M", "F", "O", "N", "U"})
+
+# Email validation regex (RFC 5322 simplified)
+EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
+
 
 def validate_contact(contact: dict[str, str], strict: bool = False) -> list[str]:
     """
@@ -46,10 +52,137 @@ def validate_contact(contact: dict[str, str], strict: bool = False) -> list[str]
 
     # Validate email format if provided
     email = contact.get("email", "").strip()
-    if email and not re.match(r"^[^@]+@[^@]+\.[^@]+$", email):
+    if email and not validate_email(email):
         warnings.append(f"Invalid email format: {email}")
 
+    # Validate multi-type emails (v0.5.0)
+    for email_field in ("email_home", "email_work"):
+        email_val = contact.get(email_field, "").strip()
+        if email_val and not validate_email(email_val):
+            warnings.append(f"Invalid email format in {email_field}: {email_val}")
+
+    # Validate gender (v0.5.0)
+    gender = contact.get("gender", "").strip()
+    if gender and not validate_gender(gender):
+        warnings.append(f"Invalid gender value: {gender}")
+
+    # Validate geo coordinates (v0.5.0)
+    geo = contact.get("geo", "").strip()
+    if geo and not validate_geo(geo):
+        warnings.append(f"Invalid geo coordinates: {geo}")
+
     return warnings
+
+
+def validate_email(email: str) -> bool:
+    """
+    Validate email address format.
+
+    Args:
+        email: Email address string
+
+    Returns:
+        True if valid, False otherwise
+
+    Examples:
+        >>> validate_email("user@example.com")
+        True
+        >>> validate_email("invalid-email")
+        False
+    """
+    if not email:
+        return False
+    return bool(EMAIL_REGEX.match(email))
+
+
+def validate_gender(gender: str) -> bool:
+    """
+    Validate vCard 4.0 gender value.
+
+    Valid values per RFC 6350:
+    - M: Male
+    - F: Female
+    - O: Other
+    - N: None/not applicable
+    - U: Unknown
+
+    Also accepts full words for user convenience.
+
+    Args:
+        gender: Gender string
+
+    Returns:
+        True if valid, False otherwise
+
+    Examples:
+        >>> validate_gender("M")
+        True
+        >>> validate_gender("Female")
+        True
+        >>> validate_gender("invalid")
+        False
+    """
+    if not gender:
+        return False
+
+    upper = gender.upper()
+
+    # Accept single letter codes
+    if upper in VALID_GENDER_VALUES:
+        return True
+
+    # Accept common full words
+    valid_words = {
+        "MALE": True,
+        "FEMALE": True,
+        "OTHER": True,
+        "NONE": True,
+        "UNKNOWN": True,
+    }
+    return upper in valid_words
+
+
+def validate_geo(geo: str) -> bool:
+    """
+    Validate geographic coordinates.
+
+    Expected format: "latitude,longitude" where:
+    - latitude: -90.0 to 90.0
+    - longitude: -180.0 to 180.0
+
+    Args:
+        geo: Coordinate string (e.g., "37.386013,-122.082932")
+
+    Returns:
+        True if valid, False otherwise
+
+    Examples:
+        >>> validate_geo("37.386013,-122.082932")
+        True
+        >>> validate_geo("91.0,0.0")
+        False
+        >>> validate_geo("invalid")
+        False
+    """
+    if not geo:
+        return False
+
+    # Allow semicolon separator (vCard 3.0 format) or comma (common format)
+    parts = geo.replace(";", ",").split(",")
+
+    if len(parts) != 2:
+        return False
+
+    try:
+        lat = float(parts[0].strip())
+        lon = float(parts[1].strip())
+    except ValueError:
+        return False
+
+    # Check valid ranges
+    if not (-90.0 <= lat <= 90.0):
+        return False
+    return -180.0 <= lon <= 180.0
 
 
 def validate_csv_file(filepath: Path, strict: bool = False) -> None:

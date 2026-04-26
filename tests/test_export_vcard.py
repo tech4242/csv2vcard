@@ -7,7 +7,12 @@ from pathlib import Path
 import pytest
 
 from csv2vcard.exceptions import ExportError
-from csv2vcard.export_vcard import ensure_export_dir, export_vcard
+from csv2vcard.export_vcard import (
+    ensure_export_dir,
+    export_vcard,
+    export_vcards_combined,
+    export_vcards_split,
+)
 from csv2vcard.models import VCardOutput, VCardVersion
 
 
@@ -200,3 +205,172 @@ class TestCheckExportDeprecation:
             check_export()
 
         assert (temp_dir / "export").exists()
+
+
+class TestExportVCardsCombined:
+    """Test combined vCard export."""
+
+    def test_combines_multiple_vcards(self, temp_dir: Path) -> None:
+        """Test that multiple vCards are combined into one file."""
+        vcards = [
+            {"filename": "a.vcf", "output": "BEGIN:VCARD\nFN:Alice\nEND:VCARD\n"},
+            {"filename": "b.vcf", "output": "BEGIN:VCARD\nFN:Bob\nEND:VCARD\n"},
+            {"filename": "c.vcf", "output": "BEGIN:VCARD\nFN:Charlie\nEND:VCARD\n"},
+        ]
+        output_path = temp_dir / "combined.vcf"
+
+        result = export_vcards_combined(vcards, output_path)
+
+        assert result.exists()
+        content = result.read_text()
+        assert content.count("BEGIN:VCARD") == 3
+        assert "FN:Alice" in content
+        assert "FN:Bob" in content
+        assert "FN:Charlie" in content
+
+    def test_accepts_vcard_output_objects(self, temp_dir: Path) -> None:
+        """Test that VCardOutput objects are accepted."""
+        vcards = [
+            VCardOutput(
+                filename="a.vcf",
+                output="BEGIN:VCARD\nFN:Alice\nEND:VCARD\n",
+                name="Alice",
+                version=VCardVersion.V3_0,
+            ),
+            VCardOutput(
+                filename="b.vcf",
+                output="BEGIN:VCARD\nFN:Bob\nEND:VCARD\n",
+                name="Bob",
+                version=VCardVersion.V3_0,
+            ),
+        ]
+        output_path = temp_dir / "combined.vcf"
+
+        result = export_vcards_combined(vcards, output_path)
+
+        assert result.exists()
+        content = result.read_text()
+        assert content.count("BEGIN:VCARD") == 2
+
+    def test_creates_parent_directory(self, temp_dir: Path) -> None:
+        """Test that parent directory is created if needed."""
+        vcards = [{"filename": "a.vcf", "output": "BEGIN:VCARD\nEND:VCARD\n"}]
+        output_path = temp_dir / "subdir" / "combined.vcf"
+
+        result = export_vcards_combined(vcards, output_path)
+
+        assert result.exists()
+        assert result.parent.exists()
+
+    def test_empty_list_creates_empty_file(self, temp_dir: Path) -> None:
+        """Test that empty list creates empty file."""
+        output_path = temp_dir / "empty.vcf"
+
+        result = export_vcards_combined([], output_path)
+
+        assert result.exists()
+        assert result.read_text() == ""
+
+
+class TestExportVCardsSplit:
+    """Test split vCard export."""
+
+    def test_split_by_count(self, temp_dir: Path) -> None:
+        """Test splitting vCards by count."""
+        vcards = [
+            {"filename": f"{i}.vcf", "output": f"BEGIN:VCARD\nFN:Contact{i}\nEND:VCARD\n"}
+            for i in range(5)
+        ]
+
+        result = export_vcards_split(
+            vcards, temp_dir, base_filename="contacts", max_vcards_per_file=2
+        )
+
+        assert len(result) == 3  # 2 + 2 + 1
+        assert all(f.exists() for f in result)
+        # First file should have 2 contacts
+        assert result[0].read_text().count("BEGIN:VCARD") == 2
+        # Last file should have 1 contact
+        assert result[2].read_text().count("BEGIN:VCARD") == 1
+
+    def test_split_by_size(self, temp_dir: Path) -> None:
+        """Test splitting vCards by file size."""
+        # Each vCard is about 40 bytes
+        vcards = [
+            {"filename": f"{i}.vcf", "output": f"BEGIN:VCARD\nFN:Contact{i}\nEND:VCARD\n"}
+            for i in range(5)
+        ]
+
+        result = export_vcards_split(
+            vcards, temp_dir, base_filename="contacts", max_file_size=100
+        )
+
+        # Should create multiple files
+        assert len(result) >= 2
+        assert all(f.exists() for f in result)
+
+    def test_split_filename_format(self, temp_dir: Path) -> None:
+        """Test that split files have correct naming format."""
+        vcards = [
+            {"filename": f"{i}.vcf", "output": f"BEGIN:VCARD\nFN:Contact{i}\nEND:VCARD\n"}
+            for i in range(3)
+        ]
+
+        result = export_vcards_split(
+            vcards, temp_dir, base_filename="export", max_vcards_per_file=1
+        )
+
+        assert result[0].name == "export_001.vcf"
+        assert result[1].name == "export_002.vcf"
+        assert result[2].name == "export_003.vcf"
+
+    def test_split_requires_parameter(self, temp_dir: Path) -> None:
+        """Test that at least one split parameter is required."""
+        vcards = [{"filename": "a.vcf", "output": "BEGIN:VCARD\nEND:VCARD\n"}]
+
+        with pytest.raises(ValueError, match="must be specified"):
+            export_vcards_split(vcards, temp_dir)
+
+    def test_split_accepts_vcard_output_objects(self, temp_dir: Path) -> None:
+        """Test that VCardOutput objects are accepted."""
+        vcards = [
+            VCardOutput(
+                filename=f"{i}.vcf",
+                output=f"BEGIN:VCARD\nFN:Contact{i}\nEND:VCARD\n",
+                name=f"Contact{i}",
+                version=VCardVersion.V3_0,
+            )
+            for i in range(4)
+        ]
+
+        result = export_vcards_split(
+            vcards, temp_dir, base_filename="contacts", max_vcards_per_file=2
+        )
+
+        assert len(result) == 2
+        assert all(f.exists() for f in result)
+
+    def test_split_creates_directory(self, temp_dir: Path) -> None:
+        """Test that output directory is created if needed."""
+        output_dir = temp_dir / "new_subdir"
+        vcards = [{"filename": "a.vcf", "output": "BEGIN:VCARD\nEND:VCARD\n"}]
+
+        result = export_vcards_split(
+            vcards, output_dir, base_filename="contacts", max_vcards_per_file=10
+        )
+
+        assert output_dir.exists()
+        assert len(result) == 1
+
+    def test_split_single_large_vcard(self, temp_dir: Path) -> None:
+        """Test that a single vCard larger than max_file_size still gets written."""
+        large_output = "BEGIN:VCARD\n" + "NOTE:" + "x" * 200 + "\nEND:VCARD\n"
+        vcards = [{"filename": "large.vcf", "output": large_output}]
+
+        result = export_vcards_split(
+            vcards, temp_dir, base_filename="contacts", max_file_size=50
+        )
+
+        # Should still create the file even though it's larger than max
+        assert len(result) == 1
+        assert result[0].exists()

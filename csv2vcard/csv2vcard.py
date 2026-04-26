@@ -7,10 +7,16 @@ import warnings
 from pathlib import Path
 
 from csv2vcard.create_vcard import create_vcard
-from csv2vcard.export_vcard import ensure_export_dir, export_vcard, export_vcards_combined
+from csv2vcard.export_vcard import (
+    ensure_export_dir,
+    export_vcard,
+    export_vcards_combined,
+    export_vcards_split,
+)
 from csv2vcard.mapping import load_mapping
 from csv2vcard.models import VCardVersion
 from csv2vcard.parse_csv import find_csv_files, parse_csv
+from csv2vcard.utils import strip_accents_from_contact
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +31,9 @@ def csv2vcard(
     single_file: bool = False,
     encoding: str | None = None,
     mapping_file: str | Path | None = None,
+    strip_accents: bool = False,
+    max_file_size: int | None = None,
+    max_vcards_per_file: int | None = None,
     csv_delimeter: str | None = None,  # Legacy parameter name (deprecated)
 ) -> list[Path]:
     """
@@ -39,6 +48,9 @@ def csv2vcard(
         single_file: Export all contacts to a single .vcf file (default: False)
         encoding: File encoding (auto-detected if None)
         mapping_file: Path to JSON mapping file (uses default if None)
+        strip_accents: Remove accents from contact fields (default: False)
+        max_file_size: Maximum file size in bytes for split files (v0.5.0)
+        max_vcards_per_file: Maximum vCards per file for split files (v0.5.0)
         csv_delimeter: DEPRECATED - use csv_delimiter instead
 
     Returns:
@@ -87,6 +99,10 @@ def csv2vcard(
             mapping=mapping,
         )
         for contact in contacts:
+            # Apply accent stripping if requested (v0.5.0)
+            if strip_accents:
+                contact = strip_accents_from_contact(contact)
+
             vcard = create_vcard(contact, version=version)
             all_vcards.append(vcard)
 
@@ -97,7 +113,15 @@ def csv2vcard(
     # Export vCards
     created_files: list[Path] = []
 
-    if single_file:
+    # File splitting mode (v0.5.0)
+    if max_file_size is not None or max_vcards_per_file is not None:
+        created_files = export_vcards_split(
+            all_vcards,
+            output_path,
+            max_file_size=max_file_size,
+            max_vcards_per_file=max_vcards_per_file,
+        )
+    elif single_file:
         # Export all to single file
         combined_filename = "contacts.vcf"
         combined_path = output_path / combined_filename

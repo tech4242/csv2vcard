@@ -23,6 +23,10 @@ Create vCards from a spreadsheet of contacts - useful for business cards, QR cod
 - **Custom CSV mapping** - Map any CSV column names to vCard fields
 - **Batch processing** - Convert entire directories of CSV files
 - **Single-file output** - Combine all contacts into one .vcf file
+- **File splitting** - Split output by size or contact count
+- **Multi-type fields** - Multiple phone numbers, emails, and addresses per contact
+- **Media embedding** - Embed photos, logos, and keys (base64 or URL)
+- **Accent stripping** - Remove diacritics for compatibility
 - **Auto-detect encoding** - Handles various file encodings
 - **Command-line interface** - Convert files directly from terminal
 - **Library API** - Use programmatically in your Python code
@@ -63,6 +67,15 @@ csv2vcard convert ./csv_folder/
 # Export all contacts to a single file
 csv2vcard convert contacts.csv --single-vcard
 
+# Split output into multiple files (max 100 contacts per file)
+csv2vcard convert contacts.csv --max-vcards-per-file 100
+
+# Split output by file size (max 1MB per file)
+csv2vcard convert contacts.csv --max-vcard-file-size 1048576
+
+# Strip accents for compatibility (é→e, ü→u)
+csv2vcard convert contacts.csv --strip-accents
+
 # Use custom column mapping
 csv2vcard convert data.csv -m mapping.json
 
@@ -91,6 +104,8 @@ csv2vcard(
     version=VCardVersion.V4_0,
     single_file=True,  # All contacts in one file
     mapping_file="mapping.json",  # Custom column names
+    strip_accents=True,  # Remove diacritics
+    max_vcards_per_file=100,  # Split into multiple files
 )
 
 # Convert entire directory
@@ -106,13 +121,47 @@ Your CSV file should have column headers that match vCard fields. Use the defaul
 
 ### Default Column Names
 
-```
-last_name,first_name,middle_name,name_prefix,name_suffix,nickname,gender,birthday,anniversary,phone,email,website,org,title,role,street,city,region,p_code,country,note
-```
-
 **Required:** `last_name`, `first_name`
 
-**Optional:** All other fields
+**Basic fields:**
+```
+last_name, first_name, middle_name, name_prefix, name_suffix, nickname, gender, birthday, anniversary, org, title, role, note
+```
+
+**Contact fields (single):**
+```
+phone, email, website
+```
+
+**Multi-type phone:**
+```
+phone_cell, phone_home, phone_work, phone_fax
+```
+
+**Multi-type email:**
+```
+email_home, email_work
+```
+
+**Work address:**
+```
+street, city, region, p_code, country
+```
+
+**Home address:**
+```
+home_street, home_city, home_region, home_p_code, home_country
+```
+
+**Media:**
+```
+photo, logo, key
+```
+
+**Additional fields:**
+```
+categories, geo, tz
+```
 
 ### Example CSV
 
@@ -149,16 +198,19 @@ Arguments:
   SOURCE  Path to CSV file or directory containing CSV files
 
 Options:
-  -d, --delimiter TEXT      CSV field delimiter (default: ",")
-  -o, --output PATH         Output directory (default: ./export/)
-  -V, --vcard-version TEXT  vCard version: 3.0 or 4.0 (default: 3.0)
-  -1, --single-vcard        Export all contacts to a single .vcf file
-  -m, --mapping PATH        Path to JSON mapping file
-  -e, --encoding TEXT       CSV file encoding (auto-detected if not set)
-  --strict                  Exit on validation errors
-  -v, --verbose             Enable verbose output
-  --version                 Show version and exit
-  --help                    Show help message
+  -d, --delimiter TEXT          CSV field delimiter (default: ",")
+  -o, --output PATH             Output directory (default: ./export/)
+  -V, --vcard-version TEXT      vCard version: 3.0 or 4.0 (default: 3.0)
+  -1, --single-vcard            Export all contacts to a single .vcf file
+  -m, --mapping PATH            Path to JSON mapping file
+  -e, --encoding TEXT           CSV file encoding (auto-detected if not set)
+  -a, --strip-accents           Remove accents/diacritics from contact fields
+  --max-vcard-file-size INT     Split output by file size (bytes)
+  --max-vcards-per-file INT     Split output by contact count
+  --strict                      Exit on validation errors
+  -v, --verbose                 Enable verbose output
+  --version                     Show version and exit
+  --help                        Show help message
 ```
 
 ## API Reference
@@ -179,6 +231,9 @@ files = csv2vcard(
     single_file=False,      # Combine all contacts into one file
     encoding=None,          # File encoding (auto-detected)
     mapping_file=None,      # Path to JSON mapping file
+    strip_accents=False,    # Remove diacritics (é→e, ü→u)
+    max_file_size=None,     # Split by file size (bytes)
+    max_vcards_per_file=None,  # Split by contact count
 )
 # Returns: List[Path] of created vCard files
 
@@ -215,10 +270,12 @@ VCardVersion.V4_0  # vCard 4.0 (RFC 6350)
 
 ## Supported vCard Fields
 
+### Name & Basic Info
+
 | Field | Description | Example |
 |-------|-------------|---------|
-| `last_name` | Family name | Doe |
-| `first_name` | Given name | John |
+| `last_name` | Family name (required) | Doe |
+| `first_name` | Given name (required) | John |
 | `middle_name` | Middle name | William |
 | `name_prefix` | Honorific prefix | Dr. |
 | `name_suffix` | Honorific suffix | Jr. |
@@ -226,18 +283,55 @@ VCardVersion.V4_0  # vCard 4.0 (RFC 6350)
 | `gender` | Gender (M/F/O/N/U) | M |
 | `birthday` | Birth date (YYYY-MM-DD) | 1990-01-15 |
 | `anniversary` | Anniversary date | 2015-06-20 |
-| `phone` | Phone number | +1234567890 |
-| `email` | Email address | john@example.com |
-| `website` | Website URL | https://example.com |
 | `org` | Organization | Acme Corp |
 | `title` | Job title | Developer |
 | `role` | Role/function | Team Lead |
-| `street` | Street address | 123 Main St |
-| `city` | City | New York |
-| `region` | State/province | NY |
-| `p_code` | Postal code | 10001 |
-| `country` | Country | USA |
 | `note` | Notes | Any additional info |
+
+### Contact Fields
+
+| Field | Description | vCard Type |
+|-------|-------------|------------|
+| `phone` | Default phone | TEL;TYPE=WORK |
+| `phone_cell` | Mobile phone | TEL;TYPE=CELL |
+| `phone_home` | Home phone | TEL;TYPE=HOME |
+| `phone_work` | Work phone | TEL;TYPE=WORK |
+| `phone_fax` | Fax number | TEL;TYPE=FAX |
+| `email` | Default email | EMAIL;TYPE=WORK |
+| `email_home` | Personal email | EMAIL;TYPE=HOME |
+| `email_work` | Work email | EMAIL;TYPE=WORK |
+| `website` | Website URL | URL |
+
+### Address Fields
+
+| Field | Description | vCard Type |
+|-------|-------------|------------|
+| `street` | Work street address | ADR;TYPE=WORK |
+| `city` | Work city | ADR;TYPE=WORK |
+| `region` | Work state/province | ADR;TYPE=WORK |
+| `p_code` | Work postal code | ADR;TYPE=WORK |
+| `country` | Work country | ADR;TYPE=WORK |
+| `home_street` | Home street address | ADR;TYPE=HOME |
+| `home_city` | Home city | ADR;TYPE=HOME |
+| `home_region` | Home state/province | ADR;TYPE=HOME |
+| `home_p_code` | Home postal code | ADR;TYPE=HOME |
+| `home_country` | Home country | ADR;TYPE=HOME |
+
+### Media Fields
+
+| Field | Description | Format |
+|-------|-------------|--------|
+| `photo` | Contact photo | URL or base64 |
+| `logo` | Company logo | URL or base64 |
+| `key` | Public key | URL or base64 |
+
+### Additional Fields
+
+| Field | Description | Example |
+|-------|-------------|---------|
+| `categories` | Tags/groups (comma-separated) | Work,Friends |
+| `geo` | Geographic coordinates | 37.386,-122.082 |
+| `tz` | Timezone | America/New_York |
 
 ## Requirements
 
