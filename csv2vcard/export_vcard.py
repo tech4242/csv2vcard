@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import warnings
+from collections.abc import Sequence
 from pathlib import Path
 
 from csv2vcard.exceptions import ExportError
@@ -61,7 +62,7 @@ def export_vcard(
         ) from None
 
     try:
-        output_file.write_text(output, encoding="utf-8")
+        output_file.write_text(output, encoding="utf-8", newline="")
         logger.info(f"Created vCard for {name}: {output_file}")
         return output_file
     except OSError as e:
@@ -100,7 +101,7 @@ def ensure_export_dir(output_dir: str | Path | None = None) -> Path:
 
 
 def export_vcards_combined(
-    vcards: list[dict[str, str] | VCardOutput],
+    vcards: Sequence[dict[str, str] | VCardOutput],
     output_path: str | Path,
 ) -> Path:
     """
@@ -133,7 +134,7 @@ def export_vcards_combined(
     combined = "".join(outputs)
 
     try:
-        output_file.write_text(combined, encoding="utf-8")
+        output_file.write_text(combined, encoding="utf-8", newline="")
         logger.info(f"Created combined vCard with {len(vcards)} contacts: {output_file}")
         return output_file
     except OSError as e:
@@ -142,7 +143,7 @@ def export_vcards_combined(
 
 
 def export_vcards_split(
-    vcards: list[dict[str, str] | VCardOutput],
+    vcards: Sequence[dict[str, str] | VCardOutput],
     output_dir: str | Path,
     base_filename: str = "contacts",
     max_file_size: int | None = None,
@@ -194,7 +195,7 @@ def export_vcards_split(
         combined = "".join(current_chunk)
 
         try:
-            output_file.write_text(combined, encoding="utf-8")
+            output_file.write_text(combined, encoding="utf-8", newline="")
             created_files.append(output_file)
             logger.info(f"Created split vCard with {len(current_chunk)} contacts: {output_file}")
         except OSError as e:

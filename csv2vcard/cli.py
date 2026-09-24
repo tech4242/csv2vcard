@@ -3,7 +3,6 @@
 import logging
 import sys
 from pathlib import Path
-from typing import Optional
 
 # Check if typer is available
 try:
@@ -33,8 +32,9 @@ if HAS_TYPER:
 
     app = typer.Typer(
         name="csv2vcard",
-        help="Convert CSV files to vCard format (3.0 and 4.0).",
+        help="Convert CSV files to vCard format (2.1, 3.0 and 4.0).",
         add_completion=False,
+        no_args_is_help=True,
     )
 
     def version_callback(value: bool) -> None:
@@ -42,6 +42,27 @@ if HAS_TYPER:
         if value:
             print(f"csv2vcard version {__version__}")
             raise typer.Exit()
+
+    @app.callback()
+    def main(
+        version: Annotated[
+            bool | None,
+            typer.Option(
+                "--version",
+                callback=version_callback,
+                is_eager=True,
+                help="Show version and exit",
+            ),
+        ] = None,
+    ) -> None:
+        """Convert CSV files to vCard format (2.1, 3.0 and 4.0)."""
+
+    def _parse_version(vcard_version: str) -> VCardVersion:
+        try:
+            return VCardVersion(vcard_version)
+        except ValueError:
+            typer.echo(f"Error: Invalid vCard version '{vcard_version}'. Use 2.1, 3.0 or 4.0.")
+            raise typer.Exit(code=1) from None
 
     @app.command()
     def convert(
@@ -61,7 +82,7 @@ if HAS_TYPER:
             ),
         ] = ",",
         output_dir: Annotated[
-            Optional[Path],
+            Path | None,
             typer.Option(
                 "--output",
                 "-o",
@@ -73,7 +94,7 @@ if HAS_TYPER:
             typer.Option(
                 "--vcard-version",
                 "-V",
-                help="vCard version to generate: 3.0 or 4.0",
+                help="vCard version to generate: 2.1, 3.0 or 4.0",
             ),
         ] = "3.0",
         single_file: Annotated[
@@ -85,7 +106,7 @@ if HAS_TYPER:
             ),
         ] = False,
         mapping_file: Annotated[
-            Optional[Path],
+            Path | None,
             typer.Option(
                 "--mapping",
                 "-m",
@@ -93,7 +114,7 @@ if HAS_TYPER:
             ),
         ] = None,
         encoding: Annotated[
-            Optional[str],
+            str | None,
             typer.Option(
                 "--encoding",
                 "-e",
@@ -109,19 +130,26 @@ if HAS_TYPER:
             ),
         ] = False,
         max_file_size: Annotated[
-            Optional[int],
+            int | None,
             typer.Option(
                 "--max-vcard-file-size",
                 help="Maximum file size in bytes for split output files",
             ),
         ] = None,
         max_vcards_per_file: Annotated[
-            Optional[int],
+            int | None,
             typer.Option(
                 "--max-vcards-per-file",
                 help="Maximum number of vCards per output file",
             ),
         ] = None,
+        keep_unmapped: Annotated[
+            bool,
+            typer.Option(
+                "--keep-unmapped",
+                help="Keep CSV columns that match no field as X- properties",
+            ),
+        ] = False,
         strict: Annotated[
             bool,
             typer.Option(
@@ -138,7 +166,7 @@ if HAS_TYPER:
             ),
         ] = False,
         version: Annotated[
-            Optional[bool],
+            bool | None,
             typer.Option(
                 "--version",
                 callback=version_callback,
@@ -163,6 +191,8 @@ if HAS_TYPER:
             csv2vcard convert data.csv --strip-accents
 
             csv2vcard convert data.csv --max-vcards-per-file 100
+
+            csv2vcard convert data.csv -V 2.1 --keep-unmapped
         """
         # Configure logging
         log_level = logging.DEBUG if verbose else logging.INFO
@@ -171,12 +201,7 @@ if HAS_TYPER:
             format="%(levelname)s: %(message)s",
         )
 
-        # Parse vCard version
-        try:
-            vc_version = VCardVersion(vcard_version)
-        except ValueError:
-            typer.echo(f"Error: Invalid vCard version '{vcard_version}'. Use 3.0 or 4.0.")
-            raise typer.Exit(code=1) from None
+        vc_version = _parse_version(vcard_version)
 
         try:
             files = csv2vcard_func(
@@ -191,6 +216,7 @@ if HAS_TYPER:
                 strip_accents=strip_accents_opt,
                 max_file_size=max_file_size,
                 max_vcards_per_file=max_vcards_per_file,
+                keep_unmapped=keep_unmapped,
             )
             if files:
                 typer.echo(f"Successfully created {len(files)} vCard file(s).")
@@ -205,7 +231,7 @@ if HAS_TYPER:
     @app.command()
     def test(
         output_dir: Annotated[
-            Optional[Path],
+            Path | None,
             typer.Option(
                 "--output",
                 "-o",
@@ -217,7 +243,7 @@ if HAS_TYPER:
             typer.Option(
                 "--vcard-version",
                 "-V",
-                help="vCard version to generate: 3.0 or 4.0",
+                help="vCard version to generate: 2.1, 3.0 or 4.0",
             ),
         ] = "3.0",
     ) -> None:
@@ -226,11 +252,7 @@ if HAS_TYPER:
 
         This is useful for verifying the installation works correctly.
         """
-        try:
-            vc_version = VCardVersion(vcard_version)
-        except ValueError:
-            typer.echo(f"Error: Invalid vCard version '{vcard_version}'. Use 3.0 or 4.0.")
-            raise typer.Exit(code=1) from None
+        vc_version = _parse_version(vcard_version)
 
         test_csv2vcard_func(output_dir=output_dir, version=vc_version)
         typer.echo("Test vCard created successfully.")
@@ -248,7 +270,7 @@ if HAS_TYPER:
 
 else:
     # Fallback app when Typer is not installed
-    def app() -> None:
+    def app() -> None:  # type: ignore[misc]
         """Fallback CLI without Typer."""
         _check_typer()
 

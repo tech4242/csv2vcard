@@ -180,3 +180,51 @@ class TestDefaultMapping:
         for field, columns in DEFAULT_MAPPING.items():
             assert isinstance(columns, list), f"{field} mapping is not a list"
             assert len(columns) > 0, f"{field} mapping is empty"
+
+
+class TestMappingV060:
+    """Test column normalization, multi-value columns and passthrough (v0.6.0)."""
+
+    def test_spaces_and_hyphens_match(self) -> None:
+        """Test that 'First Name' / 'E-Mail Address' match default aliases."""
+        row = {"First Name": "John", "Last Name": "Doe", "E-mail Address": "j@example.com"}
+        result = apply_mapping(row, DEFAULT_MAPPING)
+        assert result == {"first_name": "John", "last_name": "Doe", "email": "j@example.com"}
+
+    def test_mobile_is_cell_phone(self) -> None:
+        """Test that 'mobile' maps to phone_cell only (not also to phone)."""
+        result = apply_mapping({"mobile": "+111"}, DEFAULT_MAPPING)
+        assert result == {"phone_cell": "+111"}
+
+    def test_location_not_geo(self) -> None:
+        """Test that a 'location' column (usually a place name) isn't used as GEO."""
+        assert "geo" not in apply_mapping({"location": "Berlin"}, DEFAULT_MAPPING)
+
+    def test_numbered_columns(self) -> None:
+        """Test that numbered columns become extra values in order."""
+        row = {"Email 3": "c@x.com", "email": "a@x.com", "Email 2": "b@x.com", "Phone2": "+2"}
+        result = apply_mapping(row, DEFAULT_MAPPING)
+        assert result["email"] == "a@x.com"
+        assert result["email_2"] == "b@x.com"
+        assert result["email_3"] == "c@x.com"
+        assert result["phone"] == "+2"
+
+    def test_multi_value_collects_all_aliases(self) -> None:
+        """Test that all matching alias columns are kept for multi-value fields."""
+        row = {"website": "https://a.com", "homepage": "https://b.com"}
+        result = apply_mapping(row, DEFAULT_MAPPING)
+        assert result["website"] == "https://a.com"
+        assert result["website_2"] == "https://b.com"
+
+    def test_keep_unmapped(self) -> None:
+        """Test that unmapped non-empty columns become X- properties."""
+        row = {"first_name": "John", "Cost Center": "42", "Empty": "", "last_name": "Doe"}
+        result = apply_mapping(row, DEFAULT_MAPPING, keep_unmapped=True)
+        assert result["X-COST-CENTER"] == "42"
+        assert "X-EMPTY" not in result
+        assert "X-FIRST-NAME" not in result
+
+    def test_unmapped_dropped_by_default(self) -> None:
+        """Test that unmapped columns are dropped unless requested."""
+        result = apply_mapping({"first_name": "John", "Cost Center": "42"}, DEFAULT_MAPPING)
+        assert result == {"first_name": "John"}

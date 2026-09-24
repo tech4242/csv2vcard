@@ -207,3 +207,63 @@ class TestBackwardsCompatibility:
         files = csv2vcard(sample_csv, ",", output_dir=temp_dir)
 
         assert len(files) == 2
+
+
+class TestCSV2VCardV060:
+    """Test batch-level behavior added in v0.6.0."""
+
+    def test_same_name_contacts_not_overwritten(self, temp_dir: Path) -> None:
+        """Test that two contacts with the same name produce two files."""
+        csv_path = temp_dir / "dupes.csv"
+        csv_path.write_text(
+            "last_name,first_name,phone\nSmith,John,+1\nSmith,John,+2\nsmith,john,+3\n",
+            encoding="utf-8",
+        )
+        output_dir = temp_dir / "out"
+
+        files = csv2vcard(csv_path, output_dir=output_dir)
+
+        assert [f.name for f in files] == ["smith_john.vcf", "smith_john_2.vcf", "smith_john_3.vcf"]
+        assert len(list(output_dir.glob("*.vcf"))) == 3
+
+    def test_uids_stable_across_runs_and_unique(self, temp_dir: Path) -> None:
+        """Test that re-running yields the same UIDs, and duplicates stay distinct."""
+        csv_path = temp_dir / "dupes.csv"
+        csv_path.write_text(
+            "last_name,first_name\nSmith,John\nSmith,John\nDoe,Jane\n", encoding="utf-8"
+        )
+
+        def uids(run: str) -> list[str]:
+            files = csv2vcard(csv_path, output_dir=temp_dir / run)
+            return [
+                line
+                for f in files
+                for line in f.read_text(encoding="utf-8").splitlines()
+                if line.startswith("UID:")
+            ]
+
+        first, second = uids("a"), uids("b")
+        assert first == second
+        assert len(set(first)) == 3
+
+    def test_files_use_crlf(self, sample_csv: Path, temp_dir: Path) -> None:
+        """Test that written files keep CRLF line endings on every platform."""
+        files = csv2vcard(sample_csv, output_dir=temp_dir / "out", single_file=True)
+        data = files[0].read_bytes()
+        assert b"\r\n" in data
+        assert b"\r\r\n" not in data
+        assert data.count(b"\n") == data.count(b"\r\n")
+
+    def test_keep_unmapped(self, temp_dir: Path) -> None:
+        """Test that unmapped columns are written as X- properties on request."""
+        csv_path = temp_dir / "extra.csv"
+        csv_path.write_text("last_name,first_name,Department\nDoe,John,Sales\n", encoding="utf-8")
+
+        files = csv2vcard(csv_path, output_dir=temp_dir / "out", keep_unmapped=True)
+
+        assert "X-DEPARTMENT:Sales" in files[0].read_text(encoding="utf-8")
+
+    def test_vcard_21(self, sample_csv: Path, temp_dir: Path) -> None:
+        """Test generating vCard 2.1 files."""
+        files = csv2vcard(sample_csv, output_dir=temp_dir / "out", version=VCardVersion.V2_1)
+        assert "VERSION:2.1" in files[0].read_text(encoding="utf-8")

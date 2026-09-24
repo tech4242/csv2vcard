@@ -8,6 +8,7 @@ from pathlib import Path
 
 from csv2vcard.exceptions import ValidationError
 from csv2vcard.models import REQUIRED_FIELDS
+from csv2vcard.utils import normalize_date, parse_geo
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,8 @@ VALID_GENDER_VALUES = frozenset({"M", "F", "O", "N", "U"})
 
 # Email validation regex (RFC 5322 simplified)
 EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
+
+_EMAIL_KEY = re.compile(r"^email(_home|_work)?(_\d+)?$")
 
 
 def validate_contact(contact: dict[str, str], strict: bool = False) -> list[str]:
@@ -50,15 +53,16 @@ def validate_contact(contact: dict[str, str], strict: bool = False) -> list[str]
                 raise ValidationError(msg)
             warnings.append(msg)
 
-    # Validate email format if provided
-    email = contact.get("email", "").strip()
-    if email and not validate_email(email):
-        warnings.append(f"Invalid email format: {email}")
-
-    # Validate multi-type emails (v0.5.0)
-    for email_field in ("email_home", "email_work"):
-        email_val = contact.get(email_field, "").strip()
-        if email_val and not validate_email(email_val):
+    # Validate email format, including multi-type and numbered emails ("email_2")
+    for email_field, email_val in contact.items():
+        if not _EMAIL_KEY.match(email_field):
+            continue
+        email_val = email_val.strip()
+        if not email_val or validate_email(email_val):
+            continue
+        if email_field == "email":
+            warnings.append(f"Invalid email format: {email_val}")
+        else:
             warnings.append(f"Invalid email format in {email_field}: {email_val}")
 
     # Validate gender (v0.5.0)
@@ -70,6 +74,15 @@ def validate_contact(contact: dict[str, str], strict: bool = False) -> list[str]
     geo = contact.get("geo", "").strip()
     if geo and not validate_geo(geo):
         warnings.append(f"Invalid geo coordinates: {geo}")
+
+    # Validate dates (v0.6.0)
+    for date_field in ("birthday", "anniversary"):
+        date_val = contact.get(date_field, "").strip()
+        if date_val and normalize_date(date_val) is None:
+            warnings.append(
+                f"Unrecognized {date_field} '{date_val}' (use YYYY-MM-DD; "
+                "DD/MM vs MM/DD can't be told apart)"
+            )
 
     return warnings
 
@@ -164,25 +177,7 @@ def validate_geo(geo: str) -> bool:
         >>> validate_geo("invalid")
         False
     """
-    if not geo:
-        return False
-
-    # Allow semicolon separator (vCard 3.0 format) or comma (common format)
-    parts = geo.replace(";", ",").split(",")
-
-    if len(parts) != 2:
-        return False
-
-    try:
-        lat = float(parts[0].strip())
-        lon = float(parts[1].strip())
-    except ValueError:
-        return False
-
-    # Check valid ranges
-    if not (-90.0 <= lat <= 90.0):
-        return False
-    return -180.0 <= lon <= 180.0
+    return bool(geo) and parse_geo(geo) is not None
 
 
 def validate_csv_file(filepath: Path, strict: bool = False) -> None:

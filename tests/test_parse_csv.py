@@ -140,3 +140,63 @@ class TestIterContacts:
 
         assert len(contacts) == 1
         assert contacts[0].last_name == "Smith"
+
+
+class TestParseCSVRobustness:
+    """Test encoding and malformed-input handling (v0.6.0)."""
+
+    def test_utf8_bom(self, temp_dir: Path) -> None:
+        """Test that Excel's UTF-8 BOM doesn't break the first column."""
+        csv_path = temp_dir / "bom.csv"
+        csv_path.write_bytes("﻿last_name,first_name\r\nMüller,Jürgen\r\n".encode())
+
+        contacts = parse_csv(csv_path)
+
+        assert contacts == [{"last_name": "Müller", "first_name": "Jürgen"}]
+
+    def test_utf8_bom_with_explicit_encoding(self, temp_dir: Path) -> None:
+        """Test that the BOM is stripped even when encoding='utf-8' is passed."""
+        csv_path = temp_dir / "bom.csv"
+        csv_path.write_bytes("﻿last_name,first_name\nDoe,John\n".encode())
+
+        contacts = parse_csv(csv_path, encoding="utf-8")
+
+        assert contacts[0]["last_name"] == "Doe"
+
+    def test_column_mismatch_strict_raises(self, malformed_csv: Path) -> None:
+        """Test that malformed rows fail in strict mode instead of being dropped."""
+        with pytest.raises(ParseError, match="columns"):
+            parse_csv(malformed_csv, strict=True)
+
+    def test_undecodable_bytes_strict_raises(self, temp_dir: Path) -> None:
+        """Test that invalid bytes fail in strict mode."""
+        csv_path = temp_dir / "latin1.csv"
+        csv_path.write_bytes(b"last_name,first_name\nM\xfcller,J\xfcrgen\n")
+
+        with pytest.raises(ParseError):
+            parse_csv(csv_path, encoding="utf-8", strict=True)
+
+    def test_undecodable_bytes_warn(
+        self, temp_dir: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Test that replaced bytes are reported in non-strict mode."""
+        csv_path = temp_dir / "latin1.csv"
+        csv_path.write_bytes(b"last_name,first_name\nM\xfcller,J\xfcrgen\n")
+
+        with caplog.at_level(logging.WARNING):
+            contacts = parse_csv(csv_path, encoding="utf-8")
+
+        assert len(contacts) == 1
+        assert any("U+FFFD" in record.message for record in caplog.records)
+
+    def test_blank_lines_skipped(self, temp_dir: Path) -> None:
+        """Test that blank lines are ignored."""
+        csv_path = temp_dir / "blank.csv"
+        csv_path.write_text("last_name,first_name\n\nDoe,John\n\n", encoding="utf-8")
+
+        assert len(parse_csv(csv_path)) == 1
+
+    def test_iter_contacts_is_lazy(self, sample_csv: Path) -> None:
+        """Test that iter_contacts streams rows instead of parsing everything first."""
+        iterator = iter_contacts(sample_csv)
+        assert next(iterator).last_name == "Gump"
