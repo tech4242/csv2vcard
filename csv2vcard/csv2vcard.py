@@ -14,7 +14,7 @@ from csv2vcard.export_vcard import (
     export_vcards_split,
 )
 from csv2vcard.mapping import load_mapping
-from csv2vcard.models import VCardVersion
+from csv2vcard.models import Contact, VCardVersion
 from csv2vcard.parse_csv import find_csv_files, parse_csv
 from csv2vcard.utils import strip_accents_from_contact
 
@@ -34,6 +34,7 @@ def csv2vcard(
     strip_accents: bool = False,
     max_file_size: int | None = None,
     max_vcards_per_file: int | None = None,
+    keep_unmapped: bool = False,
     csv_delimeter: str | None = None,  # Legacy parameter name (deprecated)
 ) -> list[Path]:
     """
@@ -43,7 +44,7 @@ def csv2vcard(
         csv_filename: Path to the CSV file or directory containing CSV files
         csv_delimiter: Field delimiter character (default: ",")
         output_dir: Output directory (default: ./export/)
-        version: vCard version to generate (default: 3.0)
+        version: vCard version to generate: 2.1, 3.0 or 4.0 (default: 3.0)
         strict: Raise errors on validation issues (default: False)
         single_file: Export all contacts to a single .vcf file (default: False)
         encoding: File encoding (auto-detected if None)
@@ -51,6 +52,7 @@ def csv2vcard(
         strip_accents: Remove accents from contact fields (default: False)
         max_file_size: Maximum file size in bytes for split files (v0.5.0)
         max_vcards_per_file: Maximum vCards per file for split files (v0.5.0)
+        keep_unmapped: Keep CSV columns that match no field as X- properties (v0.6.0)
         csv_delimeter: DEPRECATED - use csv_delimiter instead
 
     Returns:
@@ -90,6 +92,8 @@ def csv2vcard(
 
     # Parse all CSV files and generate vCards
     all_vcards: list[dict[str, str]] = []
+    used_filenames: set[str] = set()
+    uid_counts: dict[str, int] = {}
     for csv_file in csv_files:
         contacts = parse_csv(
             csv_file,
@@ -97,13 +101,24 @@ def csv2vcard(
             strict=strict,
             encoding=encoding,
             mapping=mapping,
+            keep_unmapped=keep_unmapped,
         )
         for contact in contacts:
             # Apply accent stripping if requested (v0.5.0)
             if strip_accents:
                 contact = strip_accents_from_contact(contact)
 
-            vcard = create_vcard(contact, version=version)
+            contact_obj = Contact.from_dict(contact)
+
+            # Identical contacts would share a UID; number repeats so each stays
+            # distinct (and still stable across runs)
+            uid = contact_obj.generate_uid()
+            uid_counts[uid] = uid_counts.get(uid, 0) + 1
+            if uid_counts[uid] > 1:
+                contact_obj.uid = f"{uid}/{uid_counts[uid]}"
+
+            vcard = create_vcard(contact_obj, version=version)
+            vcard["filename"] = _unique_filename(vcard["filename"], used_filenames)
             all_vcards.append(vcard)
 
     if not all_vcards:
@@ -137,6 +152,19 @@ def csv2vcard(
     return created_files
 
 
+def _unique_filename(filename: str, used: set[str]) -> str:
+    """Suffix a filename (_2, _3, ...) so contacts with the same name don't overwrite each other."""
+    stem, suffix = filename.rsplit(".", 1)
+    candidate = filename
+    counter = 1
+    # Compare case-insensitively: macOS and Windows filesystems are case-insensitive
+    while candidate.lower() in used:
+        counter += 1
+        candidate = f"{stem}_{counter}.{suffix}"
+    used.add(candidate.lower())
+    return candidate
+
+
 def test_csv2vcard(
     output_dir: str | Path | None = None,
     version: VCardVersion = VCardVersion.V3_0,
@@ -146,7 +174,7 @@ def test_csv2vcard(
 
     Args:
         output_dir: Output directory (default: ./export/)
-        version: vCard version to generate (default: 3.0)
+        version: vCard version to generate: 2.1, 3.0 or 4.0 (default: 3.0)
     """
     mock_contact = {
         "last_name": "Gump",
@@ -173,3 +201,7 @@ def test_csv2vcard(
     print(vcard["output"])
 
     export_vcard(vcard, output_dir)
+
+
+# Not a test: keep pytest from collecting this public helper
+test_csv2vcard.__test__ = False  # type: ignore[attr-defined]

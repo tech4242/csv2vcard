@@ -13,21 +13,24 @@
 
 </div>
 
-A Python library for converting CSV files to vCard format (3.0 and 4.0).
+A Python library for converting CSV files to vCard format (2.1, 3.0 and 4.0).
 
 Create vCards from a spreadsheet of contacts - useful for business cards, QR codes, CRM imports, or transferring contacts between systems.
 
 ## Features
 
-- **vCard 3.0 and 4.0 support** - Generate either format
+- **vCard 2.1, 3.0 and 4.0** - Standards-compliant output (CRLF line endings, line folding, escaping); 4.0 includes RFC 9554 properties such as pronouns and social profiles, 2.1 targets legacy Outlook, car kits and feature phones
+- **Stable UIDs** - Converting the same CSV again produces the same UIDs, so re-imports update contacts instead of duplicating them
 - **Custom CSV mapping** - Map any CSV column names to vCard fields
 - **Batch processing** - Convert entire directories of CSV files
 - **Single-file output** - Combine all contacts into one .vcf file
 - **File splitting** - Split output by size or contact count
 - **Multi-type fields** - Multiple phone numbers, emails, and addresses per contact
+- **Multiple values per field** - Extra emails, phones, websites and social profiles via numbered columns (`email_2`, `Phone 3`, ...)
+- **Keep extra columns** - `--keep-unmapped` writes columns that match no field as `X-` properties instead of dropping them
 - **Media embedding** - Embed photos, logos, and keys (base64 or URL)
 - **Accent stripping** - Remove diacritics for compatibility
-- **Auto-detect encoding** - Handles various file encodings
+- **Auto-detect encoding** - Handles various file encodings, including Excel's UTF-8 with BOM
 - **Command-line interface** - Convert files directly from terminal
 - **Library API** - Use programmatically in your Python code
 - **Type hints** - Full typing support for IDE autocomplete
@@ -60,6 +63,12 @@ csv2vcard convert contacts.csv
 
 # Specify output directory and vCard version
 csv2vcard convert contacts.csv -o ./vcards -V 4.0
+
+# vCard 2.1 for legacy Outlook, car kits and feature phones
+csv2vcard convert contacts.csv -V 2.1
+
+# Keep columns that match no vCard field as X- properties
+csv2vcard convert contacts.csv --keep-unmapped
 
 # Convert all CSVs in a directory
 csv2vcard convert ./csv_folder/
@@ -106,6 +115,7 @@ csv2vcard(
     mapping_file="mapping.json",  # Custom column names
     strip_accents=True,  # Remove diacritics
     max_vcards_per_file=100,  # Split into multiple files
+    keep_unmapped=True,  # Keep unknown columns as X- properties
 )
 
 # Convert entire directory
@@ -119,13 +129,15 @@ test_csv2vcard()
 
 Your CSV file should have column headers that match vCard fields. Use the default names or create a custom mapping.
 
+Headers are matched case-insensitively and treat spaces, hyphens and underscores alike, so `First Name`, `first-name` and `first_name` are equivalent. Exports from Excel (including "CSV UTF-8" with a byte order mark) and Outlook-style headers such as `Business Street` or `Mobile Phone` work out of the box.
+
 ### Default Column Names
 
-**Required:** `last_name`, `first_name`
+**Required:** `last_name`, `first_name` (rows with only `org` become organization cards)
 
 **Basic fields:**
 ```
-last_name, first_name, middle_name, name_prefix, name_suffix, nickname, gender, birthday, anniversary, org, title, role, note
+last_name, first_name, middle_name, name_prefix, name_suffix, nickname, gender, birthday, anniversary, pronouns, language, org, title, role, note, uid
 ```
 
 **Contact fields (single):**
@@ -160,8 +172,14 @@ photo, logo, key
 
 **Additional fields:**
 ```
-categories, geo, tz
+categories, geo, tz, social_profile
 ```
+
+**Multiple values:** `phone*`, `email*`, `website` and `social_profile` accept numbered columns for extra values, e.g. `email`, `email_2`, `email_3` or `Phone 1`, `Phone 2`.
+
+**Dates:** `birthday` and `anniversary` accept `YYYY-MM-DD`, `YYYYMMDD`, `DD.MM.YYYY`, `--MM-DD` (no year) and slashed dates when day and month can be told apart. Ambiguous dates such as `06/07/1990` are reported and kept as text in vCard 4.0.
+
+**UIDs:** each vCard gets a UID derived from the name, organization and email, or from the `uid` column (`uid`, `contact_id`, `external_id`) when present.
 
 ### Example CSV
 
@@ -200,16 +218,18 @@ Arguments:
 Options:
   -d, --delimiter TEXT          CSV field delimiter (default: ",")
   -o, --output PATH             Output directory (default: ./export/)
-  -V, --vcard-version TEXT      vCard version: 3.0 or 4.0 (default: 3.0)
+  -V, --vcard-version TEXT      vCard version: 2.1, 3.0 or 4.0 (default: 3.0)
   -1, --single-vcard            Export all contacts to a single .vcf file
   -m, --mapping PATH            Path to JSON mapping file
   -e, --encoding TEXT           CSV file encoding (auto-detected if not set)
   -a, --strip-accents           Remove accents/diacritics from contact fields
   --max-vcard-file-size INT     Split output by file size (bytes)
   --max-vcards-per-file INT     Split output by contact count
-  --strict                      Exit on validation errors
+  --keep-unmapped               Keep unmapped columns as X- properties
+  --strict                      Fail on validation errors, malformed rows
+                                and undecodable bytes
   -v, --verbose                 Enable verbose output
-  --version                     Show version and exit
+  --version                     Show version and exit (also: csv2vcard --version)
   --help                        Show help message
 ```
 
@@ -234,6 +254,7 @@ files = csv2vcard(
     strip_accents=False,    # Remove diacritics (é→e, ü→u)
     max_file_size=None,     # Split by file size (bytes)
     max_vcards_per_file=None,  # Split by contact count
+    keep_unmapped=False,    # Keep unknown columns as X- properties
 )
 # Returns: List[Path] of created vCard files
 
@@ -264,8 +285,9 @@ contact = Contact(
 contact = Contact.from_dict({"last_name": "Doe", "first_name": "John"})
 
 # vCard versions
+VCardVersion.V2_1  # vCard 2.1 (legacy)
 VCardVersion.V3_0  # vCard 3.0 (RFC 2426)
-VCardVersion.V4_0  # vCard 4.0 (RFC 6350)
+VCardVersion.V4_0  # vCard 4.0 (RFC 6350 + RFC 9554)
 ```
 
 ## Supported vCard Fields
@@ -283,17 +305,20 @@ VCardVersion.V4_0  # vCard 4.0 (RFC 6350)
 | `gender` | Gender (M/F/O/N/U) | M |
 | `birthday` | Birth date (YYYY-MM-DD) | 1990-01-15 |
 | `anniversary` | Anniversary date | 2015-06-20 |
+| `pronouns` | Pronouns (vCard 4.0) | they/them |
+| `language` | Preferred language (vCard 4.0) | en |
 | `org` | Organization | Acme Corp |
 | `title` | Job title | Developer |
 | `role` | Role/function | Team Lead |
 | `note` | Notes | Any additional info |
+| `uid` | Stable ID from the source system | crm-42 |
 
 ### Contact Fields
 
 | Field | Description | vCard Type |
 |-------|-------------|------------|
 | `phone` | Default phone | TEL;TYPE=WORK |
-| `phone_cell` | Mobile phone | TEL;TYPE=CELL |
+| `phone_cell` | Mobile phone (also `mobile`, `cell`) | TEL;TYPE=CELL |
 | `phone_home` | Home phone | TEL;TYPE=HOME |
 | `phone_work` | Work phone | TEL;TYPE=WORK |
 | `phone_fax` | Fax number | TEL;TYPE=FAX |
@@ -301,6 +326,7 @@ VCardVersion.V4_0  # vCard 4.0 (RFC 6350)
 | `email_home` | Personal email | EMAIL;TYPE=HOME |
 | `email_work` | Work email | EMAIL;TYPE=WORK |
 | `website` | Website URL | URL |
+| `social_profile` | Social profile URL | SOCIALPROFILE (4.0), X-SOCIALPROFILE (2.1/3.0) |
 
 ### Address Fields
 
@@ -321,9 +347,9 @@ VCardVersion.V4_0  # vCard 4.0 (RFC 6350)
 
 | Field | Description | Format |
 |-------|-------------|--------|
-| `photo` | Contact photo | URL or base64 |
-| `logo` | Company logo | URL or base64 |
-| `key` | Public key | URL or base64 |
+| `photo` | Contact photo | URL, data: URI or base64 |
+| `logo` | Company logo | URL, data: URI or base64 |
+| `key` | Public key | URL, data: URI, base64 or ASCII-armored PGP |
 
 ### Additional Fields
 
@@ -335,7 +361,7 @@ VCardVersion.V4_0  # vCard 4.0 (RFC 6350)
 
 ## Requirements
 
-- Python 3.9 or higher
+- Python 3.10 or higher
 - For CLI: `typer` (installed with `csv2vcard[cli]`)
 - For encoding detection: `charset-normalizer` (installed with `csv2vcard[encoding]`)
 
@@ -359,7 +385,7 @@ pytest --cov=csv2vcard --cov-report=term-missing
 mypy csv2vcard
 
 # Linting
-ruff check csv2vcard
+ruff check .
 ```
 
 ## License

@@ -42,6 +42,14 @@ jobs:
           exit 1
         fi
 
+    - name: Verify __version__ matches tag
+      run: |
+        MODULE_VERSION=$(python -c "import re; print(re.search(r'__version__ = \"(.+?)\"', open('csv2vcard/_version.py').read()).group(1))")
+        if [ "$MODULE_VERSION" != "${{ steps.get_version.outputs.VERSION }}" ]; then
+          echo "Error: csv2vcard/_version.py ($MODULE_VERSION) doesn't match tag version (${{ steps.get_version.outputs.VERSION }})"
+          exit 1
+        fi
+
     - name: Install build dependencies
       run: |
         python -m pip install --upgrade pip
@@ -57,15 +65,13 @@ jobs:
       run: |
         twine check dist/*
 
+    # Uses PyPI Trusted Publishing (OIDC via id-token: write) - no API token secret.
+    # Requires a trusted publisher for this repo/workflow configured on pypi.org.
     - name: Publish to PyPI
-      env:
-        TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-      run: |
-        twine upload dist/*
+      uses: pypa/gh-action-pypi-publish@release/v1
 
     - name: Upload release assets
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         files: |
           dist/*.whl

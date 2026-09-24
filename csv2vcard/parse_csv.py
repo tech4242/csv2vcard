@@ -77,44 +77,35 @@ def find_csv_files(source: str | Path) -> list[Path]:
     raise ValueError(f"Invalid source path: {source_path}")
 
 
-def parse_csv(
-    csv_filename: str | Path,
-    csv_delimiter: str = ",",
-    *,
-    strict: bool = False,
-    encoding: str | None = None,
-    mapping: dict[str, list[str]] | None = None,
-) -> list[dict[str, str]]:
-    """
-    Parse a CSV file and return a list of contact dictionaries.
-
-    Args:
-        csv_filename: Path to the CSV file
-        csv_delimiter: Field delimiter character (default: ",")
-        strict: If True, raise errors on validation issues
-        encoding: File encoding (auto-detected if None)
-        mapping: Field mapping (uses default if None)
-
-    Returns:
-        List of contact dictionaries with vCard field names
-
-    Raises:
-        ParseError: If file cannot be parsed (only in strict mode)
-        ValidationError: If strict=True and validation fails
-    """
-    filepath = Path(csv_filename)
-
-    try:
-        validate_csv_file(filepath, strict=strict)
-    except ValidationError:
-        if strict:
-            raise
-        logger.error(f"CSV validation failed: {filepath}")
-        return []
-
-    # Detect encoding if not specified
+def _resolve_encoding(filepath: Path, encoding: str | None) -> str:
+    """Pick the encoding to read with, so a UTF-8 byte order mark is always removed."""
     if encoding is None:
         encoding = detect_encoding(filepath)
+    # Excel's "CSV UTF-8" export starts with a BOM; "utf-8-sig" strips it
+    if encoding.lower().replace("_", "-") in ("utf-8", "utf8", "ascii"):
+        return "utf-8-sig"
+    return encoding
+
+
+def _iter_contact_dicts(
+    filepath: Path,
+    csv_delimiter: str,
+    *,
+    strict: bool,
+    encoding: str | None,
+    mapping: dict[str, list[str]] | None,
+    keep_unmapped: bool,
+) -> Iterator[dict[str, str]]:
+    """
+    Stream contact dictionaries from a CSV file.
+
+    Raises:
+        ValidationError: If the file is invalid (non-strict callers handle this)
+        ParseError: On empty files, malformed rows or read errors (strict mode)
+    """
+    validate_csv_file(filepath, strict=strict)
+
+    encoding = _resolve_encoding(filepath, encoding)
 
     # Use default mapping if not provided
     if mapping is None:
@@ -123,7 +114,9 @@ def parse_csv(
     logger.info(f"Parsing CSV file: {filepath} (encoding: {encoding})")
 
     try:
-        with open(filepath, encoding=encoding, newline="", errors="replace") as f:
+        # Strict mode fails on undecodable bytes instead of silently replacing them
+        errors = "strict" if strict else "replace"
+        with open(filepath, encoding=encoding, newline="", errors=errors) as f:
             reader = csv.reader(f, delimiter=csv_delimiter)
 
             try:
@@ -132,45 +125,124 @@ def parse_csv(
                 logger.error(f"CSV file is empty: {filepath}")
                 if strict:
                     raise ParseError(f"CSV file is empty: {filepath}") from None
-                return []
+                return
 
-            # Normalize header names (strip whitespace)
-            header = [col.strip() for col in header]
+            # Normalize header names (strip whitespace and any leftover BOM)
+            header = [col.strip().lstrip("\ufeff").strip() for col in header]
             logger.debug(f"CSV headers: {header}")
 
-            contacts: list[dict[str, str]] = []
+            count = 0
             for row_num, row in enumerate(reader, start=2):
+                if not any(cell.strip() for cell in row):
+                    continue  # Skip blank lines
+
                 if len(row) != len(header):
-                    logger.warning(
-                        f"Row {row_num} has {len(row)} columns, expected {len(header)}"
-                    )
+                    msg = f"Row {row_num} has {len(row)} columns, expected {len(header)}"
+                    if strict:
+                        raise ParseError(f"{filepath}: {msg}")
+                    logger.warning(f"{msg}, skipped")
                     continue
 
+                if any("\ufffd" in cell for cell in row):
+                    logger.warning(
+                        f"Row {row_num} contains bytes that are invalid in {encoding} "
+                        "(replaced with U+FFFD); try --encoding"
+                    )
+
                 # Create raw contact dict from CSV
-                raw_contact = dict(zip(header, row))
+                raw_contact = dict(zip(header, row, strict=True))
 
                 # Apply field mapping
-                contact = apply_mapping(raw_contact, mapping)
+                contact = apply_mapping(raw_contact, mapping, keep_unmapped=keep_unmapped)
 
                 validation_warnings = validate_contact(contact, strict=strict)
                 for warning in validation_warnings:
                     logger.warning(f"Row {row_num}: {warning}")
 
-                contacts.append(contact)
+                count += 1
+                yield contact
 
-            logger.info(f"Parsed {len(contacts)} contacts from CSV")
-            return contacts
+            logger.info(f"Parsed {count} contacts from {filepath}")
 
-    except csv.Error as e:
-        logger.error(f"CSV parsing error: {e}")
+    except (csv.Error, UnicodeDecodeError) as e:
+        logger.error(f"CSV parsing error in {filepath}: {e}")
         if strict:
             raise ParseError(f"Failed to parse CSV: {e}") from e
-        return []
     except OSError as e:
         logger.error(f"I/O error reading {filepath}: {e}")
         if strict:
             raise ParseError(f"Failed to read CSV file: {e}") from e
-        return []
+
+
+def parse_csv(
+    csv_filename: str | Path,
+    csv_delimiter: str = ",",
+    *,
+    strict: bool = False,
+    encoding: str | None = None,
+    mapping: dict[str, list[str]] | None = None,
+    keep_unmapped: bool = False,
+) -> list[dict[str, str]]:
+    """
+    Parse a CSV file and return a list of contact dictionaries.
+
+    Args:
+        csv_filename: Path to the CSV file
+        csv_delimiter: Field delimiter character (default: ",")
+        strict: If True, raise errors on validation issues, malformed rows
+            and undecodable bytes
+        encoding: File encoding (auto-detected if None)
+        mapping: Field mapping (uses default if None)
+        keep_unmapped: Keep unmapped columns as X- extension properties
+
+    Returns:
+        List of contact dictionaries with vCard field names
+
+    Raises:
+        ParseError: If file cannot be parsed (only in strict mode)
+        ValidationError: If strict=True and validation fails
+    """
+    return list(iter_contact_dicts(
+        csv_filename,
+        csv_delimiter,
+        strict=strict,
+        encoding=encoding,
+        mapping=mapping,
+        keep_unmapped=keep_unmapped,
+    ))
+
+
+def iter_contact_dicts(
+    csv_filename: str | Path,
+    csv_delimiter: str = ",",
+    *,
+    strict: bool = False,
+    encoding: str | None = None,
+    mapping: dict[str, list[str]] | None = None,
+    keep_unmapped: bool = False,
+) -> Iterator[dict[str, str]]:
+    """
+    Iterate over contact dictionaries in a CSV file without loading it all.
+
+    Takes the same arguments as :func:`parse_csv`.
+
+    Yields:
+        Contact dictionaries with vCard field names
+    """
+    filepath = Path(csv_filename)
+    try:
+        yield from _iter_contact_dicts(
+            filepath,
+            csv_delimiter,
+            strict=strict,
+            encoding=encoding,
+            mapping=mapping,
+            keep_unmapped=keep_unmapped,
+        )
+    except ValidationError:
+        if strict:
+            raise
+        logger.error(f"CSV validation failed: {filepath}")
 
 
 def parse_csv_files(
@@ -180,6 +252,7 @@ def parse_csv_files(
     strict: bool = False,
     encoding: str | None = None,
     mapping_file: str | Path | None = None,
+    keep_unmapped: bool = False,
 ) -> list[dict[str, str]]:
     """
     Parse one or more CSV files from a file or directory path.
@@ -190,6 +263,7 @@ def parse_csv_files(
         strict: If True, raise errors on validation issues
         encoding: File encoding (auto-detected if None)
         mapping_file: Path to JSON mapping file (uses default if None)
+        keep_unmapped: Keep unmapped columns as X- extension properties
 
     Returns:
         List of all contact dictionaries from all CSV files
@@ -209,6 +283,7 @@ def parse_csv_files(
             strict=strict,
             encoding=encoding,
             mapping=mapping,
+            keep_unmapped=keep_unmapped,
         )
         all_contacts.extend(contacts)
 
@@ -222,21 +297,27 @@ def iter_contacts(
     *,
     encoding: str | None = None,
     mapping: dict[str, list[str]] | None = None,
+    keep_unmapped: bool = False,
 ) -> Iterator[Contact]:
     """
-    Iterate over contacts in a CSV file (memory efficient).
+    Iterate over contacts in a CSV file (memory efficient: rows are streamed).
 
     Args:
         csv_filename: Path to the CSV file
         csv_delimiter: Field delimiter character
         encoding: File encoding (auto-detected if None)
         mapping: Field mapping (uses default if None)
+        keep_unmapped: Keep unmapped columns as X- extension properties
 
     Yields:
         Contact objects
     """
-    for contact_dict in parse_csv(
-        csv_filename, csv_delimiter, encoding=encoding, mapping=mapping
+    for contact_dict in iter_contact_dicts(
+        csv_filename,
+        csv_delimiter,
+        encoding=encoding,
+        mapping=mapping,
+        keep_unmapped=keep_unmapped,
     ):
         yield Contact.from_dict(contact_dict)
 

@@ -1,11 +1,11 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=77.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "csv2vcard"
-version = "0.5.1"
-description = "A library for converting CSVs to vCards (vCard 3.0 and 4.0)"
+version = "0.6.0"
+description = "A library for converting CSVs to vCards (vCard 2.1, 3.0 and 4.0)"
 readme = "DESCRIPTION.md"
 license = "MIT"
 license-files = ["LICENSE.txt"]
@@ -16,16 +16,16 @@ keywords = ["csv", "vcard", "contacts", "export", "vcf"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Typing :: Typed",
     "Operating System :: OS Independent",
     "Topic :: Utilities",
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = []
 
 [project.optional-dependencies]
@@ -47,6 +47,7 @@ csv2vcard = "csv2vcard.cli:app"
 [project.urls]
 "Homepage" = "https://github.com/tech4242/csv2vcard"
 "Bug Tracker" = "https://github.com/tech4242/csv2vcard/issues"
+"Changelog" = "https://github.com/tech4242/csv2vcard/blob/master/CHANGELOG.md"
 
 [tool.setuptools.packages.find]
 where = ["."]
@@ -56,21 +57,17 @@ include = ["csv2vcard*"]
 csv2vcard = ["py.typed"]
 
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.10"
 warn_return_any = true
 warn_unused_configs = true
 strict = true
 
 [tool.ruff]
-target-version = "py39"
+target-version = "py310"
 line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP", "B", "C4", "SIM"]
-
-[tool.ruff.lint.per-file-ignores]
-# cli.py uses Optional[X] for Python 3.9 compatibility with Typer runtime type evaluation
-"csv2vcard/cli.py" = ["UP045"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

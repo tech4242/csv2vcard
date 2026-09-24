@@ -2,7 +2,16 @@
 
 from __future__ import annotations
 
-from csv2vcard.utils import strip_accents, strip_accents_from_contact
+import pytest
+
+from csv2vcard.utils import (
+    normalize_date,
+    parse_geo,
+    parse_utc_offset,
+    phone_to_tel_uri,
+    strip_accents,
+    strip_accents_from_contact,
+)
 
 
 class TestStripAccents:
@@ -90,3 +99,59 @@ class TestStripAccentsFromContact:
         result = strip_accents_from_contact(contact)
 
         assert set(result.keys()) == set(contact.keys())
+
+
+class TestNormalizeDate:
+    """Test date normalization (v0.6.0)."""
+
+    @pytest.mark.parametrize(
+        ("value", "expected"),
+        [
+            ("1944-06-06", "19440606"),
+            ("19440606", "19440606"),
+            ("1944/06/06", "19440606"),
+            ("1944-06-06T10:00:00Z", "19440606"),
+            ("06.06.1944", "19440606"),
+            ("24/12/1990", "19901224"),
+            ("12/24/1990", "19901224"),
+            ("05/05/1990", "19900505"),
+            ("--12-24", "--1224"),
+            ("--0229", "--0229"),
+        ],
+    )
+    def test_valid(self, value: str, expected: str) -> None:
+        assert normalize_date(value) == expected
+
+    @pytest.mark.parametrize("value", ["06/07/1990", "1990-02-30", "tomorrow", "", "--13-01"])
+    def test_invalid_or_ambiguous(self, value: str) -> None:
+        assert normalize_date(value) is None
+
+
+class TestPhoneToTelUri:
+    """Test tel: URI conversion (v0.6.0)."""
+
+    def test_global_number(self) -> None:
+        assert phone_to_tel_uri("+1 (555) 123-4567") == "tel:+1-555-123-4567"
+
+    def test_local_number(self) -> None:
+        assert phone_to_tel_uri("0170 1234") is None
+
+    def test_extension_not_supported(self) -> None:
+        assert phone_to_tel_uri("+1 555 1234 ext. 5") is None
+
+
+class TestParseHelpers:
+    """Test geo and UTC offset parsing (v0.6.0)."""
+
+    def test_geo_formats(self) -> None:
+        assert parse_geo("37.38,-122.08") == ("37.38", "-122.08")
+        assert parse_geo("37.38;-122.08") == ("37.38", "-122.08")
+        assert parse_geo("geo:37.38,-122.08") == ("37.38", "-122.08")
+        assert parse_geo("Berlin") is None
+        assert parse_geo("91,0") is None
+
+    def test_utc_offset(self) -> None:
+        assert parse_utc_offset("-05:00") == ("-", "05", "00")
+        assert parse_utc_offset("+0530") == ("+", "05", "30")
+        assert parse_utc_offset("UTC+1") == ("+", "01", "00")
+        assert parse_utc_offset("America/New_York") is None

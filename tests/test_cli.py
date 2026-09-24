@@ -183,3 +183,43 @@ class TestCLI:
         assert "CSV file" in result.stdout
         # Check for "delimiter" without dashes due to ANSI escape codes in rich output
         assert "delimiter" in result.stdout
+
+
+class TestCLIV060:
+    """Test CLI options added in v0.6.0."""
+
+    def test_top_level_version(self, runner: CliRunner) -> None:
+        """Test `csv2vcard --version` without a subcommand."""
+        from csv2vcard import __version__
+
+        result = runner.invoke(app, ["--version"])
+
+        assert result.exit_code == 0
+        assert f"csv2vcard version {__version__}" in result.stdout
+
+    def test_convert_vcard_21(
+        self, runner: CliRunner, sample_csv: Path, temp_dir: Path
+    ) -> None:
+        """Test creating vCard 2.1 via CLI."""
+        output_dir = temp_dir / "output"
+
+        result = runner.invoke(
+            app, ["convert", str(sample_csv), "-V", "2.1", "-o", str(output_dir)]
+        )
+
+        assert result.exit_code == 0
+        content = next(output_dir.glob("*.vcf")).read_text(encoding="utf-8")
+        assert "VERSION:2.1" in content
+
+    def test_keep_unmapped(self, runner: CliRunner, temp_dir: Path) -> None:
+        """Test the --keep-unmapped option."""
+        csv_path = temp_dir / "extra.csv"
+        csv_path.write_text("last_name,first_name,Team\nDoe,John,Core\n", encoding="utf-8")
+        output_dir = temp_dir / "output"
+
+        result = runner.invoke(
+            app, ["convert", str(csv_path), "--keep-unmapped", "-o", str(output_dir)]
+        )
+
+        assert result.exit_code == 0
+        assert "X-TEAM:Core" in (output_dir / "doe_john.vcf").read_text(encoding="utf-8")

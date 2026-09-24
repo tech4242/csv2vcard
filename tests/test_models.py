@@ -147,12 +147,16 @@ class TestConstants:
             "last_name", "first_name", "middle_name", "name_prefix", "name_suffix",
             # Basic info
             "nickname", "gender", "birthday", "anniversary",
+            # RFC 9554 / preferences (v0.6.0)
+            "pronouns", "language",
             # Contact - single (backwards compatible)
             "phone", "email", "website",
             # Contact - multi-type phone (v0.5.0)
             "phone_cell", "phone_home", "phone_work", "phone_fax",
             # Contact - multi-type email (v0.5.0)
             "email_home", "email_work",
+            # Social profile (v0.6.0)
+            "social_profile",
             # Organization
             "org", "title", "role",
             # Address (default/work)
@@ -164,6 +168,6 @@ class TestConstants:
             # New vCard fields (v0.5.0)
             "categories", "geo", "tz", "key",
             # Other
-            "note",
+            "note", "uid",
         }
         assert expected == ALL_FIELDS

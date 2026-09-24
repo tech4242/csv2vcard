@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from datetime import datetime, timezone
 from enum import Enum
 
@@ -12,6 +12,7 @@ from enum import Enum
 class VCardVersion(Enum):
     """Supported vCard versions."""
 
+    V2_1 = "2.1"
     V3_0 = "3.0"
     V4_0 = "4.0"
 
@@ -32,6 +33,8 @@ ALL_FIELDS: frozenset[str] = frozenset({
     "gender",
     "birthday",
     "anniversary",
+    "pronouns",   # RFC 9554 (v0.6.0)
+    "language",   # Preferred language, e.g. "en" (v0.6.0)
     # Contact - single (backwards compatible)
     "phone",
     "email",
@@ -44,6 +47,8 @@ ALL_FIELDS: frozenset[str] = frozenset({
     # Contact - multi-type email (v0.5.0)
     "email_home",
     "email_work",
+    # Social profile URL - RFC 9554 (v0.6.0)
+    "social_profile",
     # Organization
     "org",
     "title",
@@ -61,8 +66,8 @@ ALL_FIELDS: frozenset[str] = frozenset({
     "home_p_code",
     "home_country",
     # Media (v0.5.0)
-    "photo",  # URL or base64-encoded image
-    "logo",   # URL or base64-encoded image
+    "photo",  # URL, data: URI or base64-encoded image
+    "logo",   # URL, data: URI or base64-encoded image
     # New vCard fields (v0.5.0)
     "categories",  # Comma-separated list
     "geo",         # latitude,longitude
@@ -70,7 +75,31 @@ ALL_FIELDS: frozenset[str] = frozenset({
     "key",         # Public key URL or base64
     # Other
     "note",
+    "uid",  # Stable identifier from the source system (v0.6.0)
 })
+
+# Fields that may hold several values (v0.6.0). Extra values are passed in
+# contact dicts as "<field>_2", "<field>_3", ... (e.g. "email_2").
+MULTI_VALUE_FIELDS: frozenset[str] = frozenset({
+    "phone",
+    "phone_cell",
+    "phone_home",
+    "phone_work",
+    "phone_fax",
+    "email",
+    "email_home",
+    "email_work",
+    "website",
+    "social_profile",
+})
+
+# Prefix marking unmapped CSV columns passed through as vCard extension properties
+EXTENSION_PREFIX = "X-"
+
+_NUMBERED_KEY = re.compile(r"^(?P<field>[a-z_]+)_(?P<index>\d+)$")
+
+# Namespace for deterministic UIDs, so re-converting the same CSV yields the same UIDs
+UID_NAMESPACE = uuid.uuid5(uuid.NAMESPACE_URL, "https://github.com/tech4242/csv2vcard")
 
 
 @dataclass
@@ -87,8 +116,10 @@ class Contact:
     # Basic info
     nickname: str = ""
     gender: str = ""  # M, F, O, N, U or full words
-    birthday: str = ""  # YYYY-MM-DD or YYYYMMDD
-    anniversary: str = ""  # YYYY-MM-DD or YYYYMMDD
+    birthday: str = ""  # YYYY-MM-DD, YYYYMMDD, --MM-DD, DD.MM.YYYY, ...
+    anniversary: str = ""  # same formats as birthday
+    pronouns: str = ""  # e.g., "they/them" (v0.6.0)
+    language: str = ""  # e.g., "en", "de-AT" (v0.6.0)
 
     # Contact - single (backwards compatible)
     phone: str = ""
@@ -104,6 +135,9 @@ class Contact:
     # Contact - multi-type email (v0.5.0)
     email_home: str = ""
     email_work: str = ""
+
+    # Social profile URL (v0.6.0)
+    social_profile: str = ""
 
     # Organization
     org: str = ""
@@ -125,8 +159,8 @@ class Contact:
     home_country: str = ""
 
     # Media (v0.5.0)
-    photo: str = ""  # URL or base64-encoded image
-    logo: str = ""   # URL or base64-encoded image
+    photo: str = ""  # URL, data: URI or base64-encoded image
+    logo: str = ""   # URL, data: URI or base64-encoded image
 
     # New vCard fields (v0.5.0)
     categories: str = ""  # Comma-separated list
@@ -136,6 +170,12 @@ class Contact:
 
     # Other
     note: str = ""
+    uid: str = ""  # Source-system identifier; hashed into a stable UUID (v0.6.0)
+
+    # Additional values for MULTI_VALUE_FIELDS, e.g. {"email": ["second@example.com"]}
+    extra_values: dict[str, list[str]] = field(default_factory=dict)
+    # Extension properties, e.g. {"X-DEPARTMENT": "Sales"}
+    extensions: dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Validate and sanitize contact data after initialization."""
@@ -144,11 +184,22 @@ class Contact:
             value = getattr(self, field_name, "")
             if isinstance(value, str):
                 setattr(self, field_name, value.strip())
+        self.extra_values = {
+            name: [v.strip() for v in values if v.strip()]
+            for name, values in self.extra_values.items()
+        }
+        self.extensions = {
+            name: value.strip() for name, value in self.extensions.items() if value.strip()
+        }
 
     @classmethod
     def from_dict(cls, data: dict[str, str]) -> Contact:
         """
         Create Contact from dictionary, providing defaults for missing fields.
+
+        Besides the standard field names, the dictionary may contain numbered
+        keys for multi-value fields ("email_2", "phone_cell_3", ...) and
+        extension properties ("X-DEPARTMENT").
 
         Args:
             data: Dictionary with contact field values
@@ -156,116 +207,54 @@ class Contact:
         Returns:
             Contact instance
         """
-        return cls(
-            # Name components
-            last_name=data.get("last_name", ""),
-            first_name=data.get("first_name", ""),
-            middle_name=data.get("middle_name", ""),
-            name_prefix=data.get("name_prefix", ""),
-            name_suffix=data.get("name_suffix", ""),
-            # Basic info
-            nickname=data.get("nickname", ""),
-            gender=data.get("gender", ""),
-            birthday=data.get("birthday", ""),
-            anniversary=data.get("anniversary", ""),
-            # Contact - single
-            phone=data.get("phone", ""),
-            email=data.get("email", ""),
-            website=data.get("website", ""),
-            # Contact - multi-type phone (v0.5.0)
-            phone_cell=data.get("phone_cell", ""),
-            phone_home=data.get("phone_home", ""),
-            phone_work=data.get("phone_work", ""),
-            phone_fax=data.get("phone_fax", ""),
-            # Contact - multi-type email (v0.5.0)
-            email_home=data.get("email_home", ""),
-            email_work=data.get("email_work", ""),
-            # Organization
-            org=data.get("org", ""),
-            title=data.get("title", ""),
-            role=data.get("role", ""),
-            # Address (default/work)
-            street=data.get("street", ""),
-            city=data.get("city", ""),
-            region=data.get("region", ""),
-            p_code=data.get("p_code", ""),
-            country=data.get("country", ""),
-            # Address - home (v0.5.0)
-            home_street=data.get("home_street", ""),
-            home_city=data.get("home_city", ""),
-            home_region=data.get("home_region", ""),
-            home_p_code=data.get("home_p_code", ""),
-            home_country=data.get("home_country", ""),
-            # Media (v0.5.0)
-            photo=data.get("photo", ""),
-            logo=data.get("logo", ""),
-            # New vCard fields (v0.5.0)
-            categories=data.get("categories", ""),
-            geo=data.get("geo", ""),
-            tz=data.get("tz", ""),
-            key=data.get("key", ""),
-            # Other
-            note=data.get("note", ""),
-        )
+        values = {name: data.get(name, "") for name in ALL_FIELDS}
+
+        numbered: dict[str, list[tuple[int, str]]] = {}
+        extensions: dict[str, str] = {}
+        for key, value in data.items():
+            if key.startswith(EXTENSION_PREFIX):
+                extensions[key] = value
+                continue
+            match = _NUMBERED_KEY.match(key)
+            if match and match["field"] in MULTI_VALUE_FIELDS:
+                numbered.setdefault(match["field"], []).append((int(match["index"]), value))
+
+        extra_values = {
+            name: [value for _, value in sorted(items)] for name, items in numbered.items()
+        }
+        return cls(**values, extra_values=extra_values, extensions=extensions)
 
     def to_dict(self) -> dict[str, str]:
         """
         Convert to dictionary for backwards compatibility.
 
         Returns:
-            Dictionary with all contact fields
+            Dictionary with all contact fields (plus numbered and extension keys)
         """
-        return {
-            # Name components
-            "last_name": self.last_name,
-            "first_name": self.first_name,
-            "middle_name": self.middle_name,
-            "name_prefix": self.name_prefix,
-            "name_suffix": self.name_suffix,
-            # Basic info
-            "nickname": self.nickname,
-            "gender": self.gender,
-            "birthday": self.birthday,
-            "anniversary": self.anniversary,
-            # Contact - single
-            "phone": self.phone,
-            "email": self.email,
-            "website": self.website,
-            # Contact - multi-type phone (v0.5.0)
-            "phone_cell": self.phone_cell,
-            "phone_home": self.phone_home,
-            "phone_work": self.phone_work,
-            "phone_fax": self.phone_fax,
-            # Contact - multi-type email (v0.5.0)
-            "email_home": self.email_home,
-            "email_work": self.email_work,
-            # Organization
-            "org": self.org,
-            "title": self.title,
-            "role": self.role,
-            # Address (default/work)
-            "street": self.street,
-            "city": self.city,
-            "region": self.region,
-            "p_code": self.p_code,
-            "country": self.country,
-            # Address - home (v0.5.0)
-            "home_street": self.home_street,
-            "home_city": self.home_city,
-            "home_region": self.home_region,
-            "home_p_code": self.home_p_code,
-            "home_country": self.home_country,
-            # Media (v0.5.0)
-            "photo": self.photo,
-            "logo": self.logo,
-            # New vCard fields (v0.5.0)
-            "categories": self.categories,
-            "geo": self.geo,
-            "tz": self.tz,
-            "key": self.key,
-            # Other
-            "note": self.note,
-        }
+        result = {f.name: getattr(self, f.name) for f in fields(self) if f.name in ALL_FIELDS}
+        for name, extra in self.extra_values.items():
+            for index, value in enumerate(extra, start=2):
+                result[f"{name}_{index}"] = value
+        result.update(self.extensions)
+        return result
+
+    def values(self, field_name: str) -> list[str]:
+        """
+        Get all non-empty values of a field (primary value first).
+
+        Args:
+            field_name: Contact field name
+
+        Returns:
+            List of values, deduplicated in order
+        """
+        candidates = [getattr(self, field_name), *self.extra_values.get(field_name, [])]
+        return list(dict.fromkeys(v for v in candidates if v))
+
+    @property
+    def is_organization(self) -> bool:
+        """True if the contact represents an organization rather than a person."""
+        return bool(self.org) and not (self.first_name or self.middle_name or self.last_name)
 
     def get_safe_filename(self) -> str:
         """
@@ -276,17 +265,12 @@ class Contact:
         Returns:
             Safe filename ending in .vcf
         """
-        # Remove or replace unsafe characters (keep only alphanumeric, underscore, hyphen)
-        safe_last = re.sub(r"[^\w\-]", "_", self.last_name.lower())
-        safe_first = re.sub(r"[^\w\-]", "_", self.first_name.lower())
-
-        # Prevent path traversal
-        safe_last = safe_last.replace("..", "_").strip("_.")
-        safe_first = safe_first.replace("..", "_").strip("_.")
+        if self.is_organization:
+            return f"{_sanitize_filename_part(self.org) or 'unknown'}.vcf"
 
         # Ensure we have something valid
-        safe_last = safe_last or "unknown"
-        safe_first = safe_first or "contact"
+        safe_last = _sanitize_filename_part(self.last_name) or "unknown"
+        safe_first = _sanitize_filename_part(self.first_name) or "contact"
 
         return f"{safe_last}_{safe_first}.vcf"
 
@@ -297,27 +281,45 @@ class Contact:
         Returns:
             Formatted name string
         """
-        parts = []
-        if self.name_prefix:
-            parts.append(self.name_prefix)
-        if self.first_name:
-            parts.append(self.first_name)
-        if self.middle_name:
-            parts.append(self.middle_name)
-        if self.last_name:
-            parts.append(self.last_name)
-        if self.name_suffix:
-            parts.append(self.name_suffix)
-        return " ".join(parts) or "Unknown"
+        parts = [
+            self.name_prefix,
+            self.first_name,
+            self.middle_name,
+            self.last_name,
+            self.name_suffix,
+        ]
+        return " ".join(p for p in parts if p) or self.org or "Unknown"
 
     def generate_uid(self) -> str:
         """
-        Generate a unique identifier for this contact.
+        Generate a stable unique identifier for this contact.
+
+        Uses the ``uid`` field when set (kept as-is if it is a UUID, otherwise
+        hashed into one). Without it, the UID is derived from the name,
+        organization and primary email, so converting the same CSV again
+        yields the same UIDs and re-imports update instead of duplicating.
 
         Returns:
             UUID string
         """
-        return str(uuid.uuid4())
+        if self.uid:
+            try:
+                return str(uuid.UUID(self.uid))
+            except ValueError:
+                return str(uuid.uuid5(UID_NAMESPACE, f"uid:{self.uid}"))
+
+        emails = self.values("email") + self.values("email_work") + self.values("email_home")
+        identity = "|".join(
+            part.casefold()
+            for part in (
+                self.first_name,
+                self.middle_name,
+                self.last_name,
+                self.org,
+                emails[0] if emails else "",
+            )
+        )
+        return str(uuid.uuid5(UID_NAMESPACE, f"contact:{identity}"))
 
     @staticmethod
     def generate_rev() -> str:
@@ -328,6 +330,12 @@ class Contact:
             ISO 8601 timestamp string
         """
         return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+
+
+def _sanitize_filename_part(value: str) -> str:
+    """Keep only alphanumerics, underscores and hyphens; prevent path traversal."""
+    safe = re.sub(r"[^\w\-]", "_", value.lower())
+    return safe.replace("..", "_").strip("_.")
 
 
 @dataclass
