@@ -102,7 +102,12 @@ def _iter_contact_dicts(
     Raises:
         ValidationError: If the file is invalid (non-strict callers handle this)
         ParseError: On empty files, malformed rows or read errors (strict mode)
+        ValueError: If the delimiter is not a single character
     """
+    if len(csv_delimiter) != 1:
+        raise ValueError(
+            f"csv_delimiter must be a single character, got {csv_delimiter!r}"
+        )
     validate_csv_file(filepath, strict=strict)
 
     encoding = _resolve_encoding(filepath, encoding)

@@ -63,6 +63,11 @@ class TestParseCSV:
         with pytest.raises(ParseError, match="empty"):
             parse_csv(empty_csv, strict=True)
 
+    def test_parse_multi_char_delimiter(self, sample_csv: Path) -> None:
+        """A multi-character delimiter is rejected with ValueError."""
+        with pytest.raises(ValueError, match="single character"):
+            parse_csv(sample_csv, csv_delimiter=";;")
+
     def test_parse_header_only_csv(self, header_only_csv: Path) -> None:
         """Test parsing a CSV with only headers."""
         contacts = parse_csv(header_only_csv)
